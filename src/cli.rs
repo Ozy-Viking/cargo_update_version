@@ -1,4 +1,6 @@
-use clap::{Arg, ArgAction, FromArgMatches, crate_authors, crate_description};
+#![allow(dead_code)]
+use clap::{Arg, ArgAction, FromArgMatches, crate_authors, crate_version};
+
 use rusty_viking::IntoDiagnosticWithLocation;
 
 #[derive(Debug, Default)]
@@ -27,6 +29,7 @@ impl BumpVersion {
     }
 
     /// Returns `true` if the bump version is [`Minor`].
+
     ///
     /// [`Minor`]: BumpVersion::Minor
     #[must_use]
@@ -61,10 +64,18 @@ impl BumpVersion {
 
 impl Cli {
     pub fn parse() -> miette::Result<Self> {
-        let mut command = clap::command!()
+        let mut command = clap::Command::new("cargo update_version")
             .version(clap::crate_version!())
-            .about(crate_description!())
-            .author(crate_authors!());
+            .about("A simple Cargo tool for updating the version in your project.")
+            .flatten_help(true)
+            .author(crate_authors!())
+            .disable_help_subcommand(true)
+            .color(clap::ColorChoice::Always)
+            .bin_name("cargo");
+        let sub_command = clap::Command::new("update_version")
+            .author(crate_authors!())
+            .about("A simple Cargo tool for updating the version in your project.")
+            .version(clap::crate_version!());
 
         let mut args = Vec::new();
         let patch = Arg::new("patch")
@@ -72,6 +83,7 @@ impl Cli {
             .long("patch")
             .action(ArgAction::SetTrue)
             .help("Increment the version by 1 patch level. [default]")
+            .help_heading("Version Change (Choose one)")
             .conflicts_with_all(["minor", "major", "set"]);
         args.push(patch);
         let minor = Arg::new("minor")
@@ -79,6 +91,7 @@ impl Cli {
             .long("minor")
             .action(ArgAction::SetTrue)
             .help("Increment the version by 1 minor level.")
+            .help_heading("Version Change (Choose one)")
             .conflicts_with_all(["patch", "major", "set"]);
         args.push(minor);
         let major = Arg::new("major")
@@ -86,13 +99,16 @@ impl Cli {
             .long("major")
             .action(ArgAction::SetTrue)
             .help("Increment the version by 1 major level.")
+            .help_heading("Version Change (Choose one)")
             .conflicts_with_all(["patch", "minor", "set"]);
         args.push(major);
         let set_version = Arg::new("set")
             .short('s')
             .long("set")
+            .value_name(crate_version!())
             .value_parser(semver::Version::parse)
             .help("Set the version using valid semver.")
+            .help_heading("Version Change (Choose one)")
             .conflicts_with_all(["patch", "minor", "major"]);
         args.push(set_version);
 
@@ -104,7 +120,7 @@ impl Cli {
                 .help("Will run git tag as well."),
         );
 
-        command = command.args(args);
+        command = command.subcommand(sub_command.args(args));
 
         let matches = command.get_matches();
         Ok(Cli::from_arg_matches(&matches)
@@ -117,7 +133,11 @@ impl Cli {
 }
 
 impl FromArgMatches for Cli {
-    fn from_arg_matches(matches: &clap::ArgMatches) -> Result<Self, clap::Error> {
+    fn from_arg_matches(mut matches: &clap::ArgMatches) -> Result<Self, clap::Error> {
+        if let Some(m) = matches.subcommand_matches("update_version") {
+            matches = m;
+        };
+        dbg!(matches);
         let bump_version = if matches.get_flag("patch") {
             BumpVersion::Patch
         } else if matches.get_flag("minor") {
