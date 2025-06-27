@@ -1,0 +1,19 @@
+[package]
+name = "cargo_update_version"
+authors = ["Zack Hankin <admin@hankin.io>"]
+version = "0.0.1"
+edition = "2024"
+readme = "./README.md"
+description = "A simple Cargo tool for update versions in your project."
+license = "MIT"
+repository = "https://github.com/Ozy-Viking/cargo_update_version"
+categories = ["command-line-utilities", "development-tools::cargo-plugins"]
+
+[dependencies]
+cargo_metadata = { version = "0.20.0" }
+clap = { version = "4.5.40", features = ["derive", "cargo"] }
+clap-verbosity-flag = { version = "3.0.3", features = ["tracing"] }
+miette = { version = "7.6.0", features = ["fancy"] }
+rusty_viking = "0.3.0"
+semver = "1.0.26"
+tracing = { version = "0.1.41" }
