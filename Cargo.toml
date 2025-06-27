@@ -1,5 +1,5 @@
 [package]
-name = "cargo_update_version"
+name = "cargo-uv"
 authors = ["Zack Hankin <admin@hankin.io>"]
 version = "0.0.2"
 edition = "2024"
@@ -17,8 +17,3 @@ miette = { version = "7.6.0", features = ["fancy"] }
 rusty_viking = "0.3.0"
 semver = "1.0.26"
 tracing = { version = "0.1.41" }
-
-
-[[bin]]
-name = "cargo-update_version"
-path = "src/main.rs"

@@ -147,6 +147,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "cargo-uv"
+version = "0.0.2"
+dependencies = [
+ "cargo_metadata",
+ "clap",
+ "clap-verbosity-flag",
+ "miette",
+ "rusty_viking",
+ "semver",
+ "tracing",
+]
+
+[[package]]
 name = "cargo_metadata"
 version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -159,19 +172,6 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.12",
-]
-
-[[package]]
-name = "cargo_update_version"
-version = "0.0.2"
-dependencies = [
- "cargo_metadata",
- "clap",
- "clap-verbosity-flag",
- "miette",
- "rusty_viking",
- "semver",
- "tracing",
 ]
 
 [[package]]
