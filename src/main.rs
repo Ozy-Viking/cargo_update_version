@@ -1,3 +1,4 @@
+pub mod error;
 use rusty_viking::MietteDefaultConfig;
 static FOOTER: &'static str = "If the bug continues raise an issue on github.";
 mod cli;

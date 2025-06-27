@@ -1,5 +1,5 @@
 [package]
-name = "cargo-update-version"
+name = "cargo_update_version"
 authors = ["Zack Hankin <admin@hankin.io>"]
 version = "0.0.2"
 edition = "2024"
