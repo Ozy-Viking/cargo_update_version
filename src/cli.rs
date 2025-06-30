@@ -1,8 +1,8 @@
 #![allow(dead_code)]
-use std::{any::Any, env, error::Error, path::PathBuf};
+use std::{env, error::Error, path::PathBuf};
 
 use clap::{
-    Arg, ArgAction, Args, Command, FromArgMatches,
+    Arg, ArgAction, Args, FromArgMatches,
     builder::{Styles, ValueParser, styling::AnsiColor},
     crate_authors, crate_version,
     error::ErrorKind,
