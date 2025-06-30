@@ -1,0 +1,91 @@
+use std::{marker::PhantomData, path::Path};
+
+use miette::{IntoDiagnostic, bail};
+// use rusty_viking::IntoDiagnosticWithLocation;
+use semver::Version;
+use toml_edit::DocumentMut;
+use tracing::instrument;
+
+use crate::current_span;
+
+/// Indicator that the cargo file has been read.
+#[derive(Debug)]
+pub(crate) struct ReadToMemory;
+
+/// Limits what can be done until the file has been read.
+#[derive(Debug)]
+pub(crate) struct NeedToReadToMemory;
+
+#[derive(Debug)]
+pub struct CargoFile<'a, State> {
+    path: &'a Path,
+    contents: Option<DocumentMut>,
+    __state: PhantomData<State>,
+}
+
+impl<'a> CargoFile<'a, NeedToReadToMemory> {
+    pub fn new(path: &'a Path) -> miette::Result<CargoFile<'a, ReadToMemory>> {
+        let ret = Self::new_lazy(path);
+        ret.read_file()
+    }
+
+    pub fn new_lazy(path: &'a Path) -> CargoFile<'a, NeedToReadToMemory> {
+        Self {
+            path,
+            contents: None,
+            __state: PhantomData::<NeedToReadToMemory>,
+        }
+    }
+
+    #[instrument(skip(self), fields(self.path))]
+    pub fn read_file(self) -> miette::Result<CargoFile<'a, ReadToMemory>> {
+        let contents = match ::std::fs::read_to_string(self.path) {
+            Ok(contents) => contents,
+            Err(e) => {
+                tracing::error!("Failed to read to string: {}", e);
+                bail!("Tried to read file to string: {}", e)
+            }
+        };
+
+        let contents = Some(contents.parse::<DocumentMut>().into_diagnostic()?);
+        Ok(CargoFile {
+            path: self.path,
+            contents,
+            __state: PhantomData::<ReadToMemory>,
+        })
+    }
+}
+impl<'a> CargoFile<'a, ReadToMemory> {
+    #[instrument(skip_all, fields(version))]
+    pub fn get_root_package_version(&mut self) -> Option<Version> {
+        let span = current_span!();
+        let document = self.contents.as_ref().unwrap();
+        let version_item = document.get("package")?.get("version")?;
+        span.record("version", version_item.to_string());
+        tracing::info!("Current package version found.");
+        Some(Version::parse(version_item.as_str().expect("Should always be a string")).unwrap())
+    }
+
+    #[instrument(skip(self))]
+    pub fn set_root_package_version(&mut self, new_version: &Version) -> miette::Result<()> {
+        let doc = self.contents.as_mut().unwrap();
+
+        #[allow(unused_mut)]
+        let mut package_table = doc.get_mut("package").unwrap().as_table_mut().unwrap();
+        if let Some(version) = package_table.get_mut("version") {
+            let version_val = version.as_value_mut().unwrap();
+            *version_val = new_version.to_string().into();
+            version_val
+                .decor_mut()
+                .set_suffix(" # Modified by cargo-uv");
+        }
+        Ok(())
+    }
+
+    #[instrument(skip(self))]
+    pub fn write_cargo_file(&mut self) -> miette::Result<()> {
+        let contents = self.contents.as_ref().unwrap().to_string();
+        std::fs::write(self.path, contents).into_diagnostic()?;
+        Ok(())
+    }
+}

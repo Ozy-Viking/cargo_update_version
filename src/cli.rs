@@ -1,22 +1,49 @@
 #![allow(dead_code)]
-use clap::{Arg, ArgAction, FromArgMatches, crate_authors, crate_version};
+use std::{any::Any, env, error::Error, path::PathBuf};
 
+use clap::{
+    Arg, ArgAction, Args, Command, FromArgMatches,
+    builder::{Styles, ValueParser, styling::AnsiColor},
+    crate_authors, crate_version,
+    error::ErrorKind,
+};
+
+type VerbosityLevel = clap_verbosity_flag::InfoLevel;
+
+use clap_verbosity_flag::{InfoLevel, Verbosity};
 use rusty_viking::IntoDiagnosticWithLocation;
+
+use crate::error::UvError;
+
+static VERSION_CHANGE_TITLE: &'static str = "Version Change (Choose one)";
 
 #[derive(Debug, Default)]
 pub struct Cli {
+    verbosity: Verbosity<VerbosityLevel>,
     bump_version: BumpVersion,
     dioxus: bool,
     git_tag: bool,
+    manifest_path: Option<PathBuf>,
 }
 
-#[derive(Debug, Default, PartialEq, Eq)]
+#[derive(Debug, Default, PartialEq, Eq, Clone)]
 pub enum BumpVersion {
     #[default]
     Patch,
     Minor,
     Major,
     Set(semver::Version),
+}
+impl std::fmt::Display for BumpVersion {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        use BumpVersion as BV;
+        match self {
+            BV::Patch => write!(f, "Patch"),
+            BV::Minor => write!(f, "Minor"),
+            BV::Major => write!(f, "Major"),
+            BV::Set(version) => write!(f, "Set({})", version.to_string()),
+        }
+    }
 }
 
 impl BumpVersion {
@@ -64,18 +91,19 @@ impl BumpVersion {
 
 impl Cli {
     pub fn parse() -> miette::Result<Self> {
-        let mut command = clap::Command::new("cargo update_version")
-            .version(clap::crate_version!())
-            .about("A simple Cargo tool for updating the version in your project.")
-            .flatten_help(true)
+        let mut command = clap::Command::new("cargo-uv")
             .author(crate_authors!())
+            .subcommand_required(true)
+            .bin_name("cargo")
             .disable_help_subcommand(true)
+            // .allow_missing_positional(true)
             .color(clap::ColorChoice::Always)
-            .bin_name("cargo");
-        let sub_command = clap::Command::new("update_version")
+            .long_about("Intended for use with Cargo.");
+        let mut sub_command = clap::Command::new("uv")
             .author(crate_authors!())
             .about("A simple Cargo tool for updating the version in your project.")
-            .version(clap::crate_version!());
+            .version(clap::crate_version!())
+            .bin_name("cargo");
 
         let mut args = Vec::new();
         let patch = Arg::new("patch")
@@ -83,7 +111,8 @@ impl Cli {
             .long("patch")
             .action(ArgAction::SetTrue)
             .help("Increment the version by 1 patch level. [default]")
-            .help_heading("Version Change (Choose one)")
+            .help_heading(VERSION_CHANGE_TITLE)
+            .display_order(0)
             .conflicts_with_all(["minor", "major", "set"]);
         args.push(patch);
         let minor = Arg::new("minor")
@@ -91,7 +120,8 @@ impl Cli {
             .long("minor")
             .action(ArgAction::SetTrue)
             .help("Increment the version by 1 minor level.")
-            .help_heading("Version Change (Choose one)")
+            .display_order(1)
+            .help_heading(VERSION_CHANGE_TITLE)
             .conflicts_with_all(["patch", "major", "set"]);
         args.push(minor);
         let major = Arg::new("major")
@@ -99,7 +129,8 @@ impl Cli {
             .long("major")
             .action(ArgAction::SetTrue)
             .help("Increment the version by 1 major level.")
-            .help_heading("Version Change (Choose one)")
+            .display_order(2)
+            .help_heading(VERSION_CHANGE_TITLE)
             .conflicts_with_all(["patch", "minor", "set"]);
         args.push(major);
         let set_version = Arg::new("set")
@@ -107,12 +138,27 @@ impl Cli {
             .long("set")
             .value_name(crate_version!())
             .value_parser(semver::Version::parse)
+            .display_order(3)
             .help("Set the version using valid semver.")
-            .help_heading("Version Change (Choose one)")
+            .help_heading(VERSION_CHANGE_TITLE)
             .conflicts_with_all(["patch", "minor", "major"]);
         args.push(set_version);
+        let manifest_path = Arg::new("manifest-path")
+            .help("Path to the Cargo.toml file.")
+            .value_name("Path")
+            .short('P')
+            .value_parser(ValueParser::path_buf())
+            .long("manifest-path");
+        args.push(manifest_path);
 
         args.push(Arg::new("dioxus").short('d').long("dioxus").action(ArgAction::SetTrue).help("Update all the versions in the dioxus project. Nothing will occur if not in a dioxus project."));
+        args.push(
+            Arg::new("force")
+                .short('f')
+                .long("force-version")
+                .action(ArgAction::SetTrue)
+                .help("Force version bump, this will disregard all version checks."),
+        );
         args.push(
             Arg::new("git_tag")
                 .short('t')
@@ -120,9 +166,77 @@ impl Cli {
                 .help("Will run git tag as well."),
         );
 
-        command = command.subcommand(sub_command.args(args));
+        sub_command = clap_verbosity_flag::Verbosity::<VerbosityLevel>::augment_args(sub_command);
 
-        let matches = command.get_matches();
+        let styles = Styles::styled()
+            .header(AnsiColor::Yellow.on_default())
+            .usage(AnsiColor::Yellow.on_default())
+            .literal(AnsiColor::Green.on_default())
+            .error(AnsiColor::Red.on_default())
+            .valid(AnsiColor::Green.on_default())
+            .placeholder(AnsiColor::Cyan.on_default());
+        sub_command = sub_command.args(args);
+
+        command = command.subcommand(sub_command.clone()).styles(styles);
+        let mut input_args = vec!["cargo".to_string()];
+        input_args.extend(
+            env::args_os()
+                .into_iter()
+                .enumerate()
+                .filter(|(i, _)| i != &0)
+                .map(|(_, n)| n.into_string().unwrap_or_default())
+                .collect::<Vec<String>>(),
+        );
+        let recommended_given = input_args.join(" ");
+
+        let label_loc = if recommended_given.starts_with("cargo uv ") {
+            let offset = "cargo uv ".len();
+            let rem = recommended_given.len() - offset;
+            (offset, rem)
+        } else {
+            let offset = "cargo".len();
+            let rem = recommended_given.len() - offset;
+            (offset, rem)
+        };
+
+        // TODO: Remove the uv so it doesn't need the uv `try_get_matches_from`
+        let matches = match command.clone().try_get_matches() {
+            Ok(m) => m,
+            Err(e) => match e.kind() {
+                ErrorKind::DisplayHelp
+                | ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand
+                | ErrorKind::DisplayVersion => e.exit(),
+                kind => {
+                    // TODO: Implement conversion to [UvError]
+
+                    // dbg!(&e);
+                    if kind == ErrorKind::ValueValidation {
+                        if let Some(inner) = e.source() {
+                            if let Some(semver_error) = inner.downcast_ref::<semver::Error>() {
+                                super::error::UvError::Semver {
+                                    msg: semver_error.to_string(),
+                                    source_code: recommended_given,
+                                    help: "Minimum valid semver is major.minor.patch(0.2.1)."
+                                        .into(),
+                                };
+                            };
+                        }
+                    } else {
+                        dbg!(&e);
+                        Err(UvError::Clap {
+                            label: Some(label_loc),
+                            label_msg: e.kind().as_str().unwrap_or("Error here"),
+                            kind: e.kind(),
+                            source_code: recommended_given,
+                            msg: e.render().ansi().to_string(),
+                            help: sub_command.render_usage().ansi().to_string(),
+                        })?;
+                    }
+                    e.exit();
+                }
+            },
+        };
+        // let matches = command.get_matches();
         Ok(Cli::from_arg_matches(&matches)
             .into_diagnostic_with_help(Some("Error occured with clap.".into()))?)
     }
@@ -130,14 +244,24 @@ impl Cli {
     pub fn bump_version(&self) -> &BumpVersion {
         &self.bump_version
     }
+
+    pub fn manifest_path(&self) -> Option<&PathBuf> {
+        self.manifest_path.as_ref()
+    }
+
+    pub fn verbosity(&self) -> Verbosity<InfoLevel> {
+        self.verbosity
+    }
 }
 
 impl FromArgMatches for Cli {
     fn from_arg_matches(mut matches: &clap::ArgMatches) -> Result<Self, clap::Error> {
-        if let Some(m) = matches.subcommand_matches("update_version") {
+        if let Some(m) = matches.subcommand_matches("uv") {
             matches = m;
         };
-        dbg!(matches);
+        // dbg!(matches);
+        let mut verbosity = Verbosity::<VerbosityLevel>::default();
+        verbosity.update_from_arg_matches(matches)?;
         let bump_version = if matches.get_flag("patch") {
             BumpVersion::Patch
         } else if matches.get_flag("minor") {
@@ -151,10 +275,13 @@ impl FromArgMatches for Cli {
         };
         let dioxus = matches.get_flag("dioxus");
         let git_tag = matches.get_flag("git_tag");
+        let manifest_path = matches.get_one::<PathBuf>("manifest-path").cloned();
         Ok(Self {
+            verbosity,
             bump_version,
             dioxus,
             git_tag,
+            manifest_path,
         })
     }
 

@@ -148,7 +148,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-uv"
-version = "0.0.2"
+version = "0.1.0"
 dependencies = [
  "cargo_metadata",
  "clap",
@@ -156,6 +156,8 @@ dependencies = [
  "miette",
  "rusty_viking",
  "semver",
+ "thiserror 2.0.12",
+ "toml_edit",
  "tracing",
 ]
 
@@ -197,7 +199,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eeab6a5cdfc795a05538422012f20a5496f050223c91be4e5420bfd13c641fb1"
 dependencies = [
  "clap",
- "log",
  "tracing-core",
 ]
 
@@ -724,9 +725,9 @@ dependencies = [
 
 [[package]]
 name = "rusty_viking"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a65dd1bad9a18f3d59ba2ac6c8887262a7b2ea19267dac85e252b783fc288909"
+checksum = "62487aec1b25fda554077399cdd935360bf9a45d69c022f169b23306ff082ab1"
 dependencies = [
  "miette",
  "serde",
