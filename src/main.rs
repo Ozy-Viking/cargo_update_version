@@ -48,7 +48,7 @@ fn main() -> miette::Result<()> {
     // cargo_file.set_root_package_version(new_packages.get_root_package().unwrap().version())?;
     // cargo_file.write_cargo_file()?;
 
-    Git::is_dirty();
+    Git::is_dirty()?;
     Ok(())
 }
 
