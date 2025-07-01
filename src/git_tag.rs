@@ -39,8 +39,10 @@ impl Git {
         }
     }
 
+    #[instrument]
     pub fn add_cargo_file(cargo_file: &Path) -> miette::Result<()> {
         let mut git = Command::new("git");
+        info!("Staging cargo file");
         git.args(["add", &cargo_file.display().to_string()]);
         git.output().map(|_| ()).into_diagnostic()
     }
