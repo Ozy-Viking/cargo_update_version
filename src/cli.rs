@@ -23,6 +23,7 @@ pub struct Cli {
     bump_version: BumpVersion,
     dioxus: bool,
     git_tag: bool,
+    git_message: Option<String>,
     manifest_path: Option<PathBuf>,
 }
 
@@ -165,6 +166,13 @@ impl Cli {
                 .action(ArgAction::SetTrue)
                 .help("Will run git tag as well."),
         );
+        args.push(
+            Arg::new("message")
+                .short('c')
+                .long("message")
+                .value_parser(clap::builder::NonEmptyStringValueParser::new())
+                .help("Message for git commit. Defaults to new version number."),
+        );
 
         sub_command = clap_verbosity_flag::Verbosity::<VerbosityLevel>::augment_args(sub_command);
 
@@ -252,6 +260,10 @@ impl Cli {
     pub fn verbosity(&self) -> Verbosity<InfoLevel> {
         self.verbosity
     }
+
+    pub(crate) fn git_message(&self) -> Option<String> {
+        self.git_message.clone()
+    }
 }
 
 impl FromArgMatches for Cli {
@@ -276,11 +288,13 @@ impl FromArgMatches for Cli {
         let dioxus = matches.get_flag("dioxus");
         let git_tag = matches.get_flag("git_tag");
         let manifest_path = matches.get_one::<PathBuf>("manifest-path").cloned();
+        let git_message = matches.get_one::<String>("message").cloned();
         Ok(Self {
             verbosity,
             bump_version,
             dioxus,
             git_tag,
+            git_message,
             manifest_path,
         })
     }

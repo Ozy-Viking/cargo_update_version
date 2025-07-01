@@ -28,8 +28,7 @@ fn main() -> miette::Result<()> {
         Level::WARN,
         None,
     )?;
-
-    Git::is_dirty()?;
+    // Git::is_dirty()?;
     let cargo_manifest = manifest::find_matifest_path(args.manifest_path())?;
     let old_version = cargo_manifest
         .get_root_package()
@@ -50,6 +49,7 @@ fn main() -> miette::Result<()> {
     cargo_file.set_root_package_version(new_packages.get_root_package().unwrap().version())?;
     cargo_file.write_cargo_file()?;
     Git::add_cargo_file(packages.cargo_file_path())?;
+    Git::commit(args.git_message())?;
 
     Ok(())
 }

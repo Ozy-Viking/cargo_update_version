@@ -1,7 +1,7 @@
 //! Steps:
 //! 0. [x] Check that all not dirty.
-//! 1. [ ] Bump version and save to file.
-//! 2. [ ] Add change/hunk.
+//! 1. [x] Bump version and save to file.
+//! 2. [x] Add change/hunk.
 //! 3. [ ] Commit just the hunk with version change.
 //! 4. [ ] Tag the commit.
 
@@ -45,6 +45,21 @@ impl Git {
         info!("Staging cargo file");
         git.args(["add", &cargo_file.display().to_string()]);
         git.output().map(|_| ()).into_diagnostic()
+    }
+
+    #[instrument]
+    pub fn commit(git_message: Option<String>) -> miette::Result<()> {
+        let mut git = Command::new("git");
+        info!("Creating commit");
+        git.arg("commit");
+        if let Some(msg) = git_message {
+            git.args(["--message", &msg]);
+        }
+
+        let out = git.output().into_diagnostic()?;
+        let out_string = String::from_iter(out.stdout.iter().map(|&i| char::from(i)));
+        dbg!(out_string);
+        Ok(())
     }
 }
 
