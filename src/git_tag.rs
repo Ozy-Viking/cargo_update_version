@@ -1,13 +1,14 @@
 //! Steps:
-//! 0. [x] Check that all not dirty.
-//! 1. [x] Bump version and save to file.
-//! 2. [x] Add change/hunk.
-//! 3. [ ] Commit just the hunk with version change.
-//! 4. [ ] Tag the commit.
+//! 1. Check that all not dirty.
+//! 2. Bump version and save to file.
+//! 3. Add change/hunk.
+//! 4. Commit just the hunk with version change.
+//! 5. Tag the commit.
 
 use std::{path::Path, process::Command};
 
 use miette::IntoDiagnostic;
+use semver::Version;
 use tracing::{debug, info, instrument};
 
 pub struct Git;
@@ -27,6 +28,7 @@ impl Git {
         } else {
             debug!("Git stage is dirty: {} files", count);
             miette::bail!(
+                help = "Use '--allow-dirty' to avoid this check.",
                 "{} file/s in the working directory contain changes that were not yet committed into git.{}",
                 count,
                 String::from_iter(
@@ -48,17 +50,29 @@ impl Git {
     }
 
     #[instrument]
-    pub fn commit(git_message: Option<String>) -> miette::Result<()> {
+    pub fn commit(git_message: Option<String>, new_version: &Version) -> miette::Result<()> {
         let mut git = Command::new("git");
         info!("Creating commit");
         git.arg("commit");
-        if let Some(msg) = git_message {
-            git.args(["--message", &msg]);
+        match git_message {
+            Some(msg) => {
+                git.args(["--message", &msg]);
+            }
+            None => {
+                git.args(["--message", &new_version.to_string()]);
+            }
         }
 
         let out = git.output().into_diagnostic()?;
         let out_string = String::from_iter(out.stdout.iter().map(|&i| char::from(i)));
         dbg!(out_string);
+        Ok(())
+    }
+
+    pub fn tag(version: &Version) -> miette::Result<()> {
+        let mut git = Command::new("git");
+        git.args(["tag", &version.to_string()]);
+        let _ = git.output().into_diagnostic()?;
         Ok(())
     }
 }

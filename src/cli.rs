@@ -20,6 +20,7 @@ static VERSION_CHANGE_TITLE: &'static str = "Version Change (Choose one)";
 #[derive(Debug, Default)]
 pub struct Cli {
     verbosity: Verbosity<VerbosityLevel>,
+    allow_dirty: bool,
     bump_version: BumpVersion,
     dioxus: bool,
     git_tag: bool,
@@ -167,6 +168,13 @@ impl Cli {
                 .help("Will run git tag as well."),
         );
         args.push(
+            Arg::new("allow_dirty")
+                .short('a')
+                .long("allow-dirty")
+                .action(ArgAction::SetTrue)
+                .help("Allows git tag to occur in a dirty repo."),
+        );
+        args.push(
             Arg::new("message")
                 .short('c')
                 .long("message")
@@ -261,8 +269,16 @@ impl Cli {
         self.verbosity
     }
 
-    pub(crate) fn git_message(&self) -> Option<String> {
+    pub fn git_message(&self) -> Option<String> {
         self.git_message.clone()
+    }
+
+    pub fn allow_dirty(&self) -> bool {
+        self.allow_dirty
+    }
+
+    pub fn git_tag(&self) -> bool {
+        self.git_tag
     }
 }
 
@@ -287,6 +303,7 @@ impl FromArgMatches for Cli {
         };
         let dioxus = matches.get_flag("dioxus");
         let git_tag = matches.get_flag("git_tag");
+        let allow_dirty = matches.get_flag("allow_dirty");
         let manifest_path = matches.get_one::<PathBuf>("manifest-path").cloned();
         let git_message = matches.get_one::<String>("message").cloned();
         Ok(Self {
@@ -294,6 +311,7 @@ impl FromArgMatches for Cli {
             bump_version,
             dioxus,
             git_tag,
+            allow_dirty,
             git_message,
             manifest_path,
         })

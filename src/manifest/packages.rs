@@ -170,6 +170,10 @@ impl Packages {
     pub fn set_cargo_file_path(&mut self, cargo_file: PathBuf) {
         self.cargo_file_path = cargo_file;
     }
+
+    pub(crate) fn get_root_package_version(&self) -> Option<Version> {
+        self.get_root_package().map(|rp| rp.version.clone())
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]

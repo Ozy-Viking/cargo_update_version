@@ -28,7 +28,9 @@ fn main() -> miette::Result<()> {
         Level::WARN,
         None,
     )?;
-    // Git::is_dirty()?;
+    if !args.allow_dirty() {
+        Git::is_dirty()?;
+    }
     let cargo_manifest = manifest::find_matifest_path(args.manifest_path())?;
     let old_version = cargo_manifest
         .get_root_package()
@@ -45,12 +47,17 @@ fn main() -> miette::Result<()> {
         }
         BV::Set(version) => set_version(cargo_manifest, version)?,
     };
+    let new_version = new_packages
+        .get_root_package_version()
+        .expect("Assuming only root version ops.");
 
-    cargo_file.set_root_package_version(new_packages.get_root_package().unwrap().version())?;
+    cargo_file.set_root_package_version(&new_version)?;
     cargo_file.write_cargo_file()?;
-    Git::add_cargo_file(packages.cargo_file_path())?;
-    Git::commit(args.git_message())?;
-
+    if args.git_tag() {
+        Git::add_cargo_file(packages.cargo_file_path())?;
+        Git::commit(args.git_message(), &new_version)?;
+        Git::tag(&new_version)?;
+    }
     Ok(())
 }
 
