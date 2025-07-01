@@ -5,7 +5,7 @@
 //! 3. [ ] Commit just the hunk with version change.
 //! 4. [ ] Tag the commit.
 
-use std::process::Command;
+use std::{path::Path, process::Command};
 
 use miette::IntoDiagnostic;
 use tracing::{debug, info, instrument};
@@ -37,6 +37,12 @@ impl Git {
                 )
             )
         }
+    }
+
+    pub fn add_cargo_file(cargo_file: &Path) -> miette::Result<()> {
+        let mut git = Command::new("git");
+        git.args(["add", &cargo_file.display().to_string()]);
+        git.output().map(|_| ()).into_diagnostic()
     }
 }
 

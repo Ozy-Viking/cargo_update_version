@@ -49,6 +49,7 @@ fn main() -> miette::Result<()> {
 
     cargo_file.set_root_package_version(new_packages.get_root_package().unwrap().version())?;
     cargo_file.write_cargo_file()?;
+    Git::add_cargo_file(packages.cargo_file_path())?;
 
     Ok(())
 }
