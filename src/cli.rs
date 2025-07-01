@@ -286,6 +286,6 @@ impl FromArgMatches for Cli {
     }
 
     fn update_from_arg_matches(&mut self, _matches: &clap::ArgMatches) -> Result<(), clap::Error> {
-        todo!()
+        unimplemented!()
     }
 }

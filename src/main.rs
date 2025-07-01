@@ -2,6 +2,7 @@
 
 pub(crate) mod cli;
 pub(crate) mod error;
+pub(crate) mod git_tag;
 pub(crate) mod manifest;
 
 use rusty_viking::MietteDefaultConfig;

@@ -1,6 +1,6 @@
 [package]
 name = "test_cargo"
-version = "0.1.0"
+version = "0.1.1" # Modified by cargo-uv
 edition = "2024"
 
 [dependencies]

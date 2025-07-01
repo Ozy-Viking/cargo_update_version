@@ -75,9 +75,10 @@ impl<'a> CargoFile<'a, ReadToMemory> {
         if let Some(version) = package_table.get_mut("version") {
             let version_val = version.as_value_mut().unwrap();
             *version_val = new_version.to_string().into();
-            version_val
-                .decor_mut()
-                .set_suffix(" # Modified by cargo-uv");
+            // TODO: Add a flag to enable comment.
+            // version_val
+            //     .decor_mut()
+            //     .set_suffix(" # Modified by cargo-uv");
         }
         Ok(())
     }
