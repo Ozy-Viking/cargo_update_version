@@ -7,7 +7,7 @@
 
 use std::{
     path::Path,
-    process::{Child, Command, ExitStatus, Output},
+    process::{Child, Command, ExitStatus, Output, Stdio},
 };
 
 use miette::{IntoDiagnostic, bail, miette};
@@ -117,7 +117,9 @@ impl Git {
                     git_push.arg("--dry-run");
                 }
                 git_push.args([remote.as_str(), &tag_string, "--porcelain"]);
-                let _ = dbg!(git_push.get_args());
+                git_push.stdout(Stdio::null());
+                git_push.stderr(Stdio::null());
+                // let _ = dbg!(git_push.get_args());
                 git_push.spawn().into_diagnostic()
             })
             .collect::<Vec<_>>();
