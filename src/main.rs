@@ -74,6 +74,7 @@ fn main() -> miette::Result<()> {
             Git::tag(&args, &new_version, Some(vec!["--delete"]))?;
         }
     }
+    Git::is_dirty()?;
     if args.publish() {
         join_handles.push(Cargo::publish(&args)?);
     }
