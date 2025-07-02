@@ -148,7 +148,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-uv"
-version = "0.1.14"
+version = "0.1.15"
 dependencies = [
  "cargo_metadata",
  "clap",
