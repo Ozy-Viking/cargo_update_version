@@ -357,7 +357,13 @@ impl FromArgMatches for Cli {
         let dry_run = matches.get_flag("dry_run");
         let publish = matches.get_flag("publish");
         let manifest_path = matches.get_one::<PathBuf>("manifest-path").cloned();
-        let git_message = matches.get_one::<String>("message").cloned();
+        let mut git_message = matches.get_one::<String>("message").cloned();
+        if let Some(git_msg) = git_message.clone() {
+            if git_msg.trim().is_empty() {
+                git_message = None
+            }
+        };
+
         Ok(Self {
             verbosity,
             bump_version,
