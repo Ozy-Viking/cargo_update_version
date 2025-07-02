@@ -66,9 +66,7 @@ fn main() -> miette::Result<()> {
         info!("Generating git tag");
         Git::add_cargo_files(&args, packages.cargo_file_path())?;
         Git::commit(&args, &new_version)?;
-        Git::is_dirty().context("Before tag")?;
         Git::tag(&args, &new_version, None)?;
-        Git::is_dirty().context("After tag")?;
         if args.git_push() {
             let mut gpjh = Git::push(&args, &new_version).context("git push")?;
             join_handles.append(&mut gpjh);
@@ -77,7 +75,6 @@ fn main() -> miette::Result<()> {
             Git::tag(&args, &new_version, Some(vec!["--delete"]))?;
         }
     }
-    Git::is_dirty().context("Before publish")?;
     if args.publish() {
         join_handles.push(Cargo::publish(&args).context("Cargo Publish")?);
     }
