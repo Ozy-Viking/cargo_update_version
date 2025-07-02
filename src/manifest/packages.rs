@@ -97,7 +97,6 @@ impl Packages {
         self.try_set_root_package_name(package_name).ok()
     }
 
-    ///
     pub fn try_set_root_package_name<'name>(
         &mut self,
         package_name: &'name PackageName,
@@ -133,7 +132,7 @@ impl Packages {
     /// Checks whether there is a root name and returns a ref to the [root_package][Package].
     pub fn get_root_package(&self) -> Option<&Package> {
         let root_name = self.root_package_name_unchecked()?;
-        self.packages.get(&root_name)
+        self.packages.get(root_name)
     }
 
     /// Checks whether there is a root name and returns a mut ref to the [root_package][Package].

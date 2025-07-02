@@ -130,7 +130,7 @@ fn try_bump_minor(version: &mut Version, force: bool) -> Result<Version> {
     version.pre = Prerelease::EMPTY;
     version.minor += 1;
     version.patch = 0;
-    return Ok(version.clone());
+    Ok(version.clone())
 }
 
 fn try_bump_major(version: &mut Version, force: bool) -> Result<Version> {

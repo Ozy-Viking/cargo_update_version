@@ -7,10 +7,10 @@
 
 use std::{
     path::Path,
-    process::{Child, Command, ExitStatus, Output, Stdio},
+    process::{Child, Command, Output, Stdio},
 };
 
-use miette::{Context, IntoDiagnostic, bail, miette};
+use miette::{Context, IntoDiagnostic, bail};
 use semver::Version;
 use tracing::{debug, info, instrument, warn};
 
@@ -87,7 +87,7 @@ impl Git {
         Ok(())
     }
 
-    pub fn tag(cli_args: &Cli, version: &Version, args: Option<Vec<&str>>) -> miette::Result<()> {
+    pub fn tag(_cli_args: &Cli, version: &Version, args: Option<Vec<&str>>) -> miette::Result<()> {
         // if cli_args.dry_run() {
         //     info!(
         //         dry_run = true,
@@ -108,7 +108,7 @@ impl Git {
     }
 
     #[instrument]
-    pub fn generate_tag(ref version: &Version) -> String {
+    pub fn generate_tag(version: &Version) -> String {
         let tag = version.to_string();
         debug! {"Tag: {tag}", };
         tag
@@ -198,7 +198,8 @@ impl Git {
     }
 }
 
-trait OutputExt {
+#[allow(dead_code)]
+pub trait OutputExt {
     fn stderr(&self) -> String;
     fn stdout(&self) -> String;
 }

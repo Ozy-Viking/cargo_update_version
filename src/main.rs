@@ -18,7 +18,7 @@ use crate::{
     manifest::{find_matifest_path, set_version},
 };
 
-static FOOTER: &'static str = "If the bug continues raise an issue on github.";
+static FOOTER: &str = "If the bug continues, raise an issue on github: https://github.com/Ozy-Viking/cargo_update_version/issues";
 
 fn main() -> miette::Result<()> {
     MietteDefaultConfig::init_set_panic_hook(Some(FOOTER.into()))?;
@@ -94,9 +94,9 @@ fn main() -> miette::Result<()> {
             }
         }
 
-        drop_jh.iter().for_each(|&i| {
-            join_handles.remove(i);
-        });
+        for i in drop_jh {
+            join_handles.remove(i).wait().into_diagnostic()?;
+        }
     }
     Ok(())
 }
@@ -142,9 +142,16 @@ impl Cargo {
         }
         Git::is_dirty()?;
         // TODO: Add no-verify to flags.
-        cargo.args(["--color", "never", "--no-verify", "--quiet"]);
+        // TODO: Be able to remove --allow-dirty
+        cargo.args([
+            "--color",
+            "never",
+            "--no-verify",
+            "--quiet",
+            "--allow-dirty",
+        ]);
 
-        Ok(cargo.spawn().into_diagnostic()?)
+        cargo.spawn().into_diagnostic()
     }
 }
 

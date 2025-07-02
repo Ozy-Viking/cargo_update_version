@@ -76,7 +76,7 @@ impl std::fmt::Display for VersionError {
 
 impl VersionError {
     pub fn prerelease_not_empty(old_version: &Version, bump: BumpVersion) -> Self {
-        let msg = format!("Pre-release is not empty.");
+        let msg = "Pre-release is not empty.".to_string();
         // TODO: Fix the wording for version error.
         let help = Some(format!(
             "To version bump by {}, pre-release needs to be empty. Use '--force-version' to skip this check.",
@@ -85,7 +85,7 @@ impl VersionError {
 
         Self {
             old_version: old_version.clone(),
-            bump: bump,
+            bump,
             msg,
             help,
             label: None,

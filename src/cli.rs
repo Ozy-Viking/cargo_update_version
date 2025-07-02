@@ -15,7 +15,7 @@ use rusty_viking::IntoDiagnosticWithLocation;
 
 use crate::error::UvError;
 
-static VERSION_CHANGE_TITLE: &'static str = "Version Change (Choose one)";
+static VERSION_CHANGE_TITLE: &str = "Version Change (Choose one)";
 
 #[derive(Debug, Default)]
 pub struct Cli {
@@ -47,7 +47,7 @@ impl std::fmt::Display for BumpVersion {
             BV::Patch => write!(f, "Patch"),
             BV::Minor => write!(f, "Minor"),
             BV::Major => write!(f, "Major"),
-            BV::Set(version) => write!(f, "Set({})", version.to_string()),
+            BV::Set(version) => write!(f, "Set({})", version),
         }
     }
 }
@@ -62,7 +62,6 @@ impl BumpVersion {
     }
 
     /// Returns `true` if the bump version is [`Minor`].
-
     ///
     /// [`Minor`]: BumpVersion::Minor
     #[must_use]
@@ -226,7 +225,6 @@ impl Cli {
         let mut input_args = vec!["cargo".to_string()];
         input_args.extend(
             env::args_os()
-                .into_iter()
                 .enumerate()
                 .filter(|(i, _)| i != &0)
                 .map(|(_, n)| n.into_string().unwrap_or_default())
@@ -257,7 +255,7 @@ impl Cli {
                     if kind == ErrorKind::ValueValidation {
                         if let Some(inner) = e.source() {
                             if let Some(semver_error) = inner.downcast_ref::<semver::Error>() {
-                                super::error::UvError::Semver {
+                                let _ = super::error::UvError::Semver {
                                     msg: semver_error.to_string(),
                                     source_code: recommended_given,
                                     help: "Minimum valid semver is major.minor.patch(0.2.1)."
@@ -281,8 +279,8 @@ impl Cli {
             },
         };
         // let matches = command.get_matches();
-        Ok(Cli::from_arg_matches(&matches)
-            .into_diagnostic_with_help(Some("Error occured with clap.".into()))?)
+        Cli::from_arg_matches(&matches)
+            .into_diagnostic_with_help(Some("Error occured with clap.".into()))
     }
 
     pub fn bump_version(&self) -> &BumpVersion {
