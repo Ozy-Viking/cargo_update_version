@@ -7,7 +7,7 @@
 
 use std::{
     path::Path,
-    process::{Command, Output},
+    process::{Child, Command, ExitStatus, Output},
 };
 
 use miette::{IntoDiagnostic, bail, miette};
@@ -90,8 +90,9 @@ impl Git {
         if let Some(a) = args {
             git.args(a);
         }
-        git.args(["tag", &Git::generate_tag(version)]);
-        let _ = dbg!(git.output().into_diagnostic()?);
+        git.args([&Git::generate_tag(version)]);
+        let _output = git.output().into_diagnostic()?;
+
         Ok(())
     }
 
@@ -104,7 +105,7 @@ impl Git {
 
     /// Pushed just the tag to the remotes
     #[instrument(skip_all)]
-    pub fn push(cli_args: &Cli, version: &Version) -> miette::Result<()> {
+    pub fn push(cli_args: &Cli, version: &Version) -> miette::Result<Vec<Child>> {
         let tag_string = String::from("tags/") + &Git::generate_tag(version);
         let join = Git::remotes()?
             .iter()
@@ -120,11 +121,13 @@ impl Git {
                 git_push.spawn().into_diagnostic()
             })
             .collect::<Vec<_>>();
+        let mut ret = vec![];
+
         for jh in join {
-            let child = jh?.wait_with_output().into_diagnostic()?;
-            dbg!(child.stdout());
+            ret.push(jh?);
         }
-        Ok(())
+
+        Ok(ret)
     }
 
     /// Returns a list of remotes for the current branch.

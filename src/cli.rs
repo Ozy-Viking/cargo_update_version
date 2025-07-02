@@ -206,7 +206,7 @@ impl Cli {
         );
         args.push(
             Arg::new("publish")
-                .long("cargo-publish")
+                .long("publish")
                 .action(ArgAction::SetTrue)
                 .help("Runs cargo publish last."),
         );

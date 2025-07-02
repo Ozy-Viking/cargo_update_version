@@ -5,9 +5,11 @@ pub(crate) mod error;
 pub(crate) mod git_tag;
 pub(crate) mod manifest;
 
+use std::process::{Child, Command};
+
 use miette::{IntoDiagnostic, bail};
 use rusty_viking::MietteDefaultConfig;
-use tracing::{Level, info};
+use tracing::{Level, debug, error, info};
 use tracing_subscriber::util::SubscriberInitExt;
 
 use crate::{
@@ -58,19 +60,43 @@ fn main() -> miette::Result<()> {
     if !args.dry_run() {
         cargo_file.write_cargo_file()?;
     }
+    let mut join_handles = vec![];
     if args.git_tag() {
         info!("Generating git tag");
         Git::add_cargo_file(&args, packages.cargo_file_path())?;
         Git::commit(&args, &new_version)?;
         Git::tag(&args, &new_version, None)?;
         if args.git_push() {
-            Git::push(&args, &new_version)?;
+            let mut gpjh = Git::push(&args, &new_version)?;
+            join_handles.append(&mut gpjh);
         }
         if args.dry_run() {
             Git::tag(&args, &new_version, Some(vec!["--delete"]))?;
         }
     }
-    if args.publish() {}
+    if args.publish() {
+        join_handles.push(Cargo::publish(&args)?);
+    }
+
+    while !join_handles.is_empty() {
+        let mut drop_jh = vec![];
+        for (i, join_handle) in &mut join_handles.iter_mut().enumerate() {
+            match join_handle.try_wait() {
+                Ok(Some(es)) => {
+                    drop_jh.push(i);
+                    debug!("Command {} finish with {}", join_handle.id(), es);
+                }
+                Ok(None) => {}
+                Err(e) => {
+                    error!("Error occured while running a command: {}", e)
+                }
+            }
+        }
+
+        drop_jh.iter().for_each(|&i| {
+            join_handles.remove(i);
+        });
+    }
     Ok(())
 }
 
@@ -99,6 +125,24 @@ fn setup_tracing(args: &Cli) -> miette::Result<()> {
     }
     builder.finish().try_init().into_diagnostic()?;
     Ok(())
+}
+
+struct Cargo;
+impl Cargo {
+    fn command() -> Command {
+        Command::new("cargo")
+    }
+
+    fn publish(cli_args: &Cli) -> miette::Result<Child> {
+        let mut cargo = Cargo::command();
+        if cli_args.dry_run() {
+            cargo.arg("--dry-run");
+        }
+        // TODO: Add no-verify to flags.
+        cargo.args(["--color", "never", "--no-verify", "--quiet"]);
+
+        Ok(cargo.spawn().into_diagnostic()?)
+    }
 }
 
 #[macro_export]
