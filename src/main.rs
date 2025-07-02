@@ -65,7 +65,9 @@ fn main() -> miette::Result<()> {
     if args.git_tag() {
         info!("Generating git tag");
         Git::add_cargo_files(&args, packages.cargo_file_path())?;
+        Git::is_dirty().context("Before Commit")?;
         Git::commit(&args, &new_version)?;
+        Git::is_dirty().context("Before tag")?;
         Git::tag(&args, &new_version, None)?;
         Git::is_dirty().context("After tag")?;
         if args.git_push() {
