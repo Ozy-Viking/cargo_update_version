@@ -79,6 +79,7 @@ impl Git {
                 git.args(["--message", &new_version.to_string()]);
             }
         }
+        dbg!(&git);
 
         // TODO: Output of commited files.
         let _stdout = dbg!(git.output().into_diagnostic()?);
