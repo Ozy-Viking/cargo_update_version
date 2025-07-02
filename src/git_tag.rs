@@ -48,8 +48,17 @@ impl Git {
     #[instrument]
     pub fn add_cargo_file(cli_args: &Cli, cargo_file: &Path) -> miette::Result<()> {
         let mut git = Git::command();
+        let cargo_lock = cargo_file
+            .to_path_buf()
+            .parent()
+            .unwrap()
+            .join("Cargo.lock");
         info!("Staging cargo file");
-        git.args(["add", &cargo_file.display().to_string()]);
+        git.args([
+            "add",
+            &cargo_file.display().to_string(),
+            &cargo_lock.display().to_string(),
+        ]);
         git.output().map(|_| ()).into_diagnostic()
     }
 
