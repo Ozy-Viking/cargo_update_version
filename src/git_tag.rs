@@ -46,7 +46,7 @@ impl Git {
     }
 
     #[instrument]
-    pub fn add_cargo_file(cli_args: &Cli, cargo_file: &Path) -> miette::Result<()> {
+    pub fn add_cargo_files(cli_args: &Cli, cargo_file: &Path) -> miette::Result<()> {
         let mut git = Git::command();
         let cargo_lock = cargo_file
             .to_path_buf()
@@ -82,7 +82,6 @@ impl Git {
 
         // TODO: Output of commited files.
         let _stdout = dbg!(git.output().into_diagnostic()?);
-
         Ok(())
     }
 

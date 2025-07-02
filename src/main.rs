@@ -58,12 +58,13 @@ fn main() -> miette::Result<()> {
 
     cargo_file.set_root_package_version(&new_version)?;
     if !args.dry_run() {
+        info!("Writing Cargo File");
         cargo_file.write_cargo_file()?;
     }
     let mut join_handles = vec![];
     if args.git_tag() {
         info!("Generating git tag");
-        Git::add_cargo_file(&args, packages.cargo_file_path())?;
+        Git::add_cargo_files(&args, packages.cargo_file_path())?;
         Git::commit(&args, &new_version)?;
         Git::tag(&args, &new_version, None)?;
         if args.git_push() {
