@@ -72,7 +72,7 @@ impl Git {
         }
 
         // TODO: Output of commited files.
-        let _stdout = git.output().into_diagnostic()?.stdout();
+        let _stdout = dbg!(git.output().into_diagnostic()?);
         Ok(())
     }
 
