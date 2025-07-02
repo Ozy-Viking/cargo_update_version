@@ -10,7 +10,7 @@ use std::{
     process::{Child, Command, ExitStatus, Output, Stdio},
 };
 
-use miette::{IntoDiagnostic, bail, miette};
+use miette::{Context, IntoDiagnostic, bail, miette};
 use semver::Version;
 use tracing::{debug, info, instrument, warn};
 
@@ -83,7 +83,7 @@ impl Git {
 
         // TODO: Output of commited files.
         let _stdout = dbg!(git.output().into_diagnostic()?);
-        Git::is_dirty()?;
+        Git::is_dirty().context("After Commit")?;
         Ok(())
     }
 
