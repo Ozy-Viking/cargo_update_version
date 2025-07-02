@@ -8,7 +8,7 @@ use clap::{
     error::ErrorKind,
 };
 
-use clap_verbosity_flag::{InfoLevel, Verbosity};
+use clap_verbosity_flag::Verbosity;
 use rusty_viking::IntoDiagnosticWithLocation;
 
 type VerbosityLevel = clap_verbosity_flag::WarnLevel;
@@ -291,7 +291,7 @@ impl Cli {
         self.manifest_path.as_ref()
     }
 
-    pub fn verbosity(&self) -> Verbosity<InfoLevel> {
+    pub fn verbosity(&self) -> Verbosity<VerbosityLevel> {
         self.verbosity
     }
 
