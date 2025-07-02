@@ -117,6 +117,7 @@ fn setup_tracing(args: &Cli) -> miette::Result<()> {
     let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new(target.to_string()));
 
+    #[allow(unused_mut)]
     let mut builder = tracing_subscriber::fmt()
         .without_time()
         .with_env_filter(env_filter);

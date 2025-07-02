@@ -195,19 +195,20 @@ impl Cli {
                 .short('n')
                 .long("dry-run")
                 .action(ArgAction::SetTrue)
-                .help("Prints the current version of your project then exits."),
+                .help("Does a dry-run, will create a tag but then deletes it.")
+                .long_help("Does a dry-run, will create a tag but then deletes it.\n This is needed for git push.")
         );
         args.push(
             Arg::new("git_push")
                 .long("push")
                 .action(ArgAction::SetTrue)
-                .help("Push's the tag to the repository."),
+                .help("Pushes the tag to all remotes of the current branch not just origin."),
         );
         args.push(
             Arg::new("publish")
                 .long("publish")
                 .action(ArgAction::SetTrue)
-                .help("Runs cargo publish last."),
+                .help("Runs cargo publish. Allow dirty is required here."),
         );
 
         sub_command = clap_verbosity_flag::Verbosity::<VerbosityLevel>::augment_args(sub_command);

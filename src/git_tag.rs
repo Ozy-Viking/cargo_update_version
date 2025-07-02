@@ -16,6 +16,7 @@ use tracing::{debug, info, instrument, warn};
 
 use crate::cli::Cli;
 
+// TODO: Use the directory of the cargo file maybe /workspace.
 pub struct Git;
 
 impl Git {
@@ -87,6 +88,7 @@ impl Git {
         Ok(())
     }
 
+    #[instrument]
     pub fn tag(_cli_args: &Cli, version: &Version, args: Option<Vec<&str>>) -> miette::Result<()> {
         // if cli_args.dry_run() {
         //     info!(
@@ -146,6 +148,7 @@ impl Git {
     /// Returns a list of remotes for the current branch.
     ///
     /// Returns an error if the list is empty
+    #[instrument]
     pub fn remotes() -> miette::Result<Vec<String>> {
         let mut git = Git::command();
         git.args(["remote"]);
