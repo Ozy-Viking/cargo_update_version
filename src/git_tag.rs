@@ -91,7 +91,7 @@ impl Git {
             git.args(a);
         }
         git.args(["tag", &Git::generate_tag(version)]);
-        let _ = git.output().into_diagnostic()?;
+        let _ = dbg!(git.output().into_diagnostic()?);
         Ok(())
     }
 

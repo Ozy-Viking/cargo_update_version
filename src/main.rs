@@ -7,7 +7,7 @@ pub(crate) mod manifest;
 
 use miette::{IntoDiagnostic, bail};
 use rusty_viking::MietteDefaultConfig;
-use tracing::Level;
+use tracing::{Level, info};
 use tracing_subscriber::util::SubscriberInitExt;
 
 use crate::{
@@ -59,6 +59,7 @@ fn main() -> miette::Result<()> {
         cargo_file.write_cargo_file()?;
     }
     if args.git_tag() {
+        info!("Generating git tag");
         Git::add_cargo_file(&args, packages.cargo_file_path())?;
         Git::commit(&args, &new_version)?;
         Git::tag(&args, &new_version, None)?;
