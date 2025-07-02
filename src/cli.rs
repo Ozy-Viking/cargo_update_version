@@ -22,10 +22,14 @@ pub struct Cli {
     verbosity: Verbosity<VerbosityLevel>,
     allow_dirty: bool,
     bump_version: BumpVersion,
-    dioxus: bool,
     git_tag: bool,
     git_message: Option<String>,
     manifest_path: Option<PathBuf>,
+    print_version: bool,
+    force_version: bool,
+    git_push: bool,
+    publish: bool,
+    pub(crate) dry_run: bool,
 }
 
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
@@ -104,7 +108,6 @@ impl Cli {
         let mut sub_command = clap::Command::new("uv")
             .author(crate_authors!())
             .about("A simple Cargo tool for updating the version in your project.")
-            .version(clap::crate_version!())
             .bin_name("cargo");
 
         let mut args = Vec::new();
@@ -112,7 +115,7 @@ impl Cli {
             .short('p')
             .long("patch")
             .action(ArgAction::SetTrue)
-            .help("Increment the version by 1 patch level. [default]")
+            .help("Increment the version by 1 patch level. [default selection]")
             .help_heading(VERSION_CHANGE_TITLE)
             .display_order(0)
             .conflicts_with_all(["minor", "major", "set"]);
@@ -153,9 +156,8 @@ impl Cli {
             .long("manifest-path");
         args.push(manifest_path);
 
-        args.push(Arg::new("dioxus").short('d').long("dioxus").action(ArgAction::SetTrue).help("Update all the versions in the dioxus project. Nothing will occur if not in a dioxus project."));
         args.push(
-            Arg::new("force")
+            Arg::new("force_version")
                 .short('f')
                 .long("force-version")
                 .action(ArgAction::SetTrue)
@@ -164,6 +166,7 @@ impl Cli {
         args.push(
             Arg::new("git_tag")
                 .short('t')
+                .long("git-tag")
                 .action(ArgAction::SetTrue)
                 .help("Will run git tag as well."),
         );
@@ -180,6 +183,32 @@ impl Cli {
                 .long("message")
                 .value_parser(clap::builder::NonEmptyStringValueParser::new())
                 .help("Message for git commit. Defaults to new version number."),
+        );
+        args.push(
+            Arg::new("print_version")
+                .short('V')
+                .long("version")
+                .action(ArgAction::SetTrue)
+                .help("Prints the current version of your project then exits."),
+        );
+        args.push(
+            Arg::new("dry_run")
+                .short('n')
+                .long("dry-run")
+                .action(ArgAction::SetTrue)
+                .help("Prints the current version of your project then exits."),
+        );
+        args.push(
+            Arg::new("git_push")
+                .long("push")
+                .action(ArgAction::SetTrue)
+                .help("Push's the tag to the repository."),
+        );
+        args.push(
+            Arg::new("publish")
+                .long("cargo-publish")
+                .action(ArgAction::SetTrue)
+                .help("Runs cargo publish last."),
         );
 
         sub_command = clap_verbosity_flag::Verbosity::<VerbosityLevel>::augment_args(sub_command);
@@ -225,7 +254,6 @@ impl Cli {
                 kind => {
                     // TODO: Implement conversion to [UvError]
 
-                    // dbg!(&e);
                     if kind == ErrorKind::ValueValidation {
                         if let Some(inner) = e.source() {
                             if let Some(semver_error) = inner.downcast_ref::<semver::Error>() {
@@ -280,6 +308,26 @@ impl Cli {
     pub fn git_tag(&self) -> bool {
         self.git_tag
     }
+
+    pub fn print_version(&self) -> bool {
+        self.print_version
+    }
+
+    pub fn force(&self) -> bool {
+        self.force_version
+    }
+
+    pub fn git_push(&self) -> bool {
+        self.git_push
+    }
+
+    pub fn publish(&self) -> bool {
+        self.publish
+    }
+
+    pub fn dry_run(&self) -> bool {
+        self.dry_run
+    }
 }
 
 impl FromArgMatches for Cli {
@@ -301,19 +349,27 @@ impl FromArgMatches for Cli {
         } else {
             BumpVersion::default()
         };
-        let dioxus = matches.get_flag("dioxus");
         let git_tag = matches.get_flag("git_tag");
         let allow_dirty = matches.get_flag("allow_dirty");
+        let print_version = matches.get_flag("print_version");
+        let force_version = matches.get_flag("force_version");
+        let git_push = matches.get_flag("git_push");
+        let dry_run = matches.get_flag("dry_run");
+        let publish = matches.get_flag("publish");
         let manifest_path = matches.get_one::<PathBuf>("manifest-path").cloned();
         let git_message = matches.get_one::<String>("message").cloned();
         Ok(Self {
             verbosity,
             bump_version,
-            dioxus,
             git_tag,
             allow_dirty,
             git_message,
             manifest_path,
+            print_version,
+            force_version,
+            git_push,
+            publish,
+            dry_run,
         })
     }
 

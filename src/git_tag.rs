@@ -5,23 +5,27 @@
 //! 4. Commit just the hunk with version change.
 //! 5. Tag the commit.
 
-use std::{path::Path, process::Command};
+use std::{
+    path::Path,
+    process::{Command, Output},
+};
 
-use miette::IntoDiagnostic;
+use miette::{IntoDiagnostic, bail, miette};
 use semver::Version;
-use tracing::{debug, info, instrument};
+use tracing::{debug, info, instrument, warn};
+
+use crate::cli::Cli;
 
 pub struct Git;
 
 impl Git {
     #[instrument]
     pub fn is_dirty() -> miette::Result<bool> {
-        let mut git_status = Command::new("git");
+        let mut git_status = Git::command();
         git_status.args(["status", "--short"]);
-        let out = git_status.output().into_diagnostic()?;
+        let stdout = git_status.output().into_diagnostic()?.stdout();
 
-        let out_string = String::from_iter(out.stdout.iter().map(|&i| char::from(i)));
-        let count = out_string.lines().count();
+        let count = stdout.lines().count();
         if count == 0 {
             info!("Git is clean");
             Ok(true)
@@ -32,7 +36,7 @@ impl Git {
                 "{} file/s in the working directory contain changes that were not yet committed into git.{}",
                 count,
                 String::from_iter(
-                    GitFile::parse(out_string)
+                    GitFile::parse(stdout)
                         .unwrap_or_default()
                         .iter()
                         .map(|s| "\n  ".to_string() + &s.to_string())
@@ -42,19 +46,23 @@ impl Git {
     }
 
     #[instrument]
-    pub fn add_cargo_file(cargo_file: &Path) -> miette::Result<()> {
-        let mut git = Command::new("git");
+    pub fn add_cargo_file(cli_args: &Cli, cargo_file: &Path) -> miette::Result<()> {
+        let mut git = Git::command();
         info!("Staging cargo file");
         git.args(["add", &cargo_file.display().to_string()]);
         git.output().map(|_| ()).into_diagnostic()
     }
 
     #[instrument]
-    pub fn commit(git_message: Option<String>, new_version: &Version) -> miette::Result<()> {
-        let mut git = Command::new("git");
+    pub fn commit(cli_args: &Cli, new_version: &Version) -> miette::Result<()> {
+        let mut git = Git::command();
         info!("Creating commit");
-        git.arg("commit");
-        match git_message {
+        git.args(["commit", "--short"]);
+
+        if cli_args.dry_run() {
+            git.arg("--dry-run");
+        }
+        match cli_args.git_message() {
             Some(msg) => {
                 git.args(["--message", &msg]);
             }
@@ -63,17 +71,129 @@ impl Git {
             }
         }
 
-        let out = git.output().into_diagnostic()?;
-        let out_string = String::from_iter(out.stdout.iter().map(|&i| char::from(i)));
-        dbg!(out_string);
+        // TODO: Output of commited files.
+        let _stdout = git.output().into_diagnostic()?.stdout();
         Ok(())
     }
 
-    pub fn tag(version: &Version) -> miette::Result<()> {
-        let mut git = Command::new("git");
-        git.args(["tag", &version.to_string()]);
+    pub fn tag(cli_args: &Cli, version: &Version, args: Option<Vec<&str>>) -> miette::Result<()> {
+        // if cli_args.dry_run() {
+        //     info!(
+        //         dry_run = true,
+        //         "Would of taged: {}",
+        //         Git::generate_tag(version)
+        //     );
+        //     return Ok(());
+        // }
+        let mut git = Git::command();
+        git.arg("tag");
+        if let Some(a) = args {
+            git.args(a);
+        }
+        git.args(["tag", &Git::generate_tag(version)]);
         let _ = git.output().into_diagnostic()?;
         Ok(())
+    }
+
+    #[instrument]
+    pub fn generate_tag(ref version: &Version) -> String {
+        let tag = version.to_string();
+        debug! {"Tag: {tag}", };
+        tag
+    }
+
+    /// Pushed just the tag to the remotes
+    #[instrument(skip_all)]
+    pub fn push(cli_args: &Cli, version: &Version) -> miette::Result<()> {
+        let tag_string = String::from("tags/") + &Git::generate_tag(version);
+        let join = Git::remotes()?
+            .iter()
+            .map(|remote| {
+                info!("Pushing to remote: {remote}");
+                let mut git_push = Git::command();
+                git_push.arg("push");
+                if cli_args.dry_run() {
+                    git_push.arg("--dry-run");
+                }
+                git_push.args([remote.as_str(), &tag_string, "--porcelain"]);
+                let _ = dbg!(git_push.get_args());
+                git_push.spawn().into_diagnostic()
+            })
+            .collect::<Vec<_>>();
+        for jh in join {
+            let child = jh?.wait_with_output().into_diagnostic()?;
+            dbg!(child.stdout());
+        }
+        Ok(())
+    }
+
+    /// Returns a list of remotes for the current branch.
+    ///
+    /// Returns an error if the list is empty
+    pub fn remotes() -> miette::Result<Vec<String>> {
+        let mut git = Git::command();
+        git.args(["remote"]);
+        let remotes: Vec<String> = git
+            .output()
+            .into_diagnostic()?
+            .stdout()
+            .lines()
+            .map(String::from)
+            .collect();
+
+        let mut branch_remotes = Vec::new();
+
+        for line in Git::branch(vec!["--remotes"])?.lines() {
+            let valid_remote = match line.split_once('/') {
+                Some((remote, _branch)) => remote.trim().to_string(),
+                None => {
+                    warn!("Ensure you only run command on a branch with a remote.");
+                    bail!("Failed to find remote for current branch.")
+                }
+            };
+            assert!(remotes.contains(&valid_remote));
+
+            branch_remotes.push(valid_remote);
+        }
+        info!("Remotes: {:?}", branch_remotes);
+
+        assert!(!branch_remotes.is_empty());
+        assert!(remotes.len() >= branch_remotes.len());
+        if branch_remotes.is_empty() {
+            warn!("Ensure you only run command on a branch with a remote.");
+            bail!("Failed to find remote for current branch.")
+        }
+        Ok(branch_remotes)
+    }
+
+    #[instrument]
+    pub fn branch(args: Vec<&str>) -> miette::Result<String> {
+        let mut git = Git::command();
+        git.arg("branch");
+        args.iter().for_each(|&arg| {
+            git.arg(arg);
+        });
+        git.output().map(|output| output.stdout()).into_diagnostic()
+    }
+
+    /// Base git command
+    fn command() -> Command {
+        Command::new("git")
+    }
+}
+
+trait OutputExt {
+    fn stderr(&self) -> String;
+    fn stdout(&self) -> String;
+}
+
+impl OutputExt for Output {
+    fn stderr(&self) -> String {
+        String::from_iter(self.stderr.iter().map(|&c| char::from(c)))
+    }
+
+    fn stdout(&self) -> String {
+        String::from_iter(self.stdout.iter().map(|&c| char::from(c)))
     }
 }
 

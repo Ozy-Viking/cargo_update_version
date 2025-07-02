@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 use cargo_metadata::MetadataCommand;
 use miette::Result;
-use semver::Version;
+use semver::{Prerelease, Version};
 pub(crate) use toml_file::CargoFile;
 use tracing::{info, instrument, warn};
 
@@ -85,11 +85,8 @@ pub fn find_matifest_path(cli_path: Option<&PathBuf>) -> Result<Packages> {
 }
 
 /// Build metadata is untouched during buming.
-#[instrument(fields(from, to), skip(packages))]
-pub(crate) fn bump_version(
-    bump_version: &crate::cli::BumpVersion,
-    mut packages: Packages,
-) -> Result<Packages> {
+#[instrument(fields(from, to), skip(packages, args))]
+pub(crate) fn bump_version(args: &crate::cli::Cli, mut packages: Packages) -> Result<Packages> {
     let span = current_span!();
     info!("Bumping Version");
 
@@ -98,10 +95,10 @@ pub(crate) fn bump_version(
         info!("Root package name: {}", root_package.name());
         let current_version = root_package.version_mut();
         use crate::cli::BumpVersion as BumpVer;
-        let new_version = match &bump_version {
+        let new_version = match args.bump_version() {
             BumpVer::Patch => bump_patch(current_version),
-            BumpVer::Minor => try_bump_minor(current_version)?,
-            BumpVer::Major => bump_major(current_version),
+            BumpVer::Minor => try_bump_minor(current_version, args.force())?,
+            BumpVer::Major => try_bump_major(current_version, args.force())?,
             BumpVer::Set(_) => unreachable!("Already sent to different function."),
         };
         span.record("to", new_version.to_string());
@@ -122,31 +119,34 @@ fn bump_patch(version: &mut Version) -> Version {
     version.clone()
 }
 
-fn try_bump_minor(version: &mut Version) -> Result<Version> {
+fn try_bump_minor(version: &mut Version, force: bool) -> Result<Version> {
     let old_version = version.clone();
-    if !version.pre.is_empty() {
+    if !version.pre.is_empty() && !force {
         Err(VersionError::prerelease_not_empty(
             &old_version,
             BumpVersion::Minor,
         ))?;
     }
-
+    version.pre = Prerelease::EMPTY;
     version.minor += 1;
     version.patch = 0;
     return Ok(version.clone());
 }
 
-fn bump_major(version: &mut Version) -> Version {
+fn try_bump_major(version: &mut Version, force: bool) -> Result<Version> {
     let old_version = version.clone();
-    if version.pre.is_empty() {
-        version.major += 1;
-        version.minor = 0;
-        version.patch = 0;
-    } else {
-        version.pre = semver::Prerelease::EMPTY
+    if !version.pre.is_empty() && !force {
+        Err(VersionError::prerelease_not_empty(
+            &old_version,
+            BumpVersion::Minor,
+        ))?;
     }
+    version.pre = Prerelease::EMPTY;
+    version.major += 1;
+    version.minor = 0;
+    version.patch = 0;
     assert!(&old_version < version);
-    version.clone()
+    Ok(version.clone())
 }
 #[instrument(skip(packages))]
 pub fn set_version(mut packages: Packages, new_version: &semver::Version) -> Result<Packages> {
@@ -221,29 +221,37 @@ mod tests {
     fn bump_minor_simple() {
         let mut version = version!(0 1 1);
 
-        try_bump_minor(&mut version);
+        try_bump_minor(&mut version, false);
         assert_eq!(version, version!(0 2 0), "Bump 0.1.1 -> 0.2.0");
-        try_bump_minor(&mut version);
+        try_bump_minor(&mut version, false);
         assert_eq!(version, version!(0 3 0), "Bump 0.2.0 -> 0.3.0");
     }
 
     #[test]
-    fn bump_minor_pre() {
+    fn bump_minor_pre_force() {
         let mut version = version!("0.1.1-alpha.2");
 
         assert_eq!(version.pre, Prerelease::new("alpha.2").unwrap());
-        try_bump_minor(&mut version);
+        try_bump_minor(&mut version, true);
         assert_eq!(version, version!(0 1 1), "Bump 0.1.1-alpha.2 -> 0.2.0");
         assert!(version > version!("0.1.1-alpha.2"));
+    }
+    #[test]
+    #[should_panic]
+    fn bump_minor_pre_no_force() {
+        let mut version = version!("0.1.1-alpha.2");
+
+        assert_eq!(version.pre, Prerelease::new("alpha.2").unwrap());
+        try_bump_minor(&mut version, false).unwrap();
     }
 
     #[test]
     fn bump_major_simple() {
         let mut version = version!(0 1 1);
 
-        bump_major(&mut version);
+        try_bump_major(&mut version, false);
         assert_eq!(version, version!(1 0 0), "Bump 0.1.1 -> 1.0.0");
-        bump_major(&mut version);
+        try_bump_major(&mut version, false);
         assert_eq!(version, version!(2 0 0), "Bump 1.0.0 -> 2.0.0");
     }
 
@@ -252,8 +260,17 @@ mod tests {
         let mut version = version!("0.1.1-alpha.2");
 
         assert_eq!(version.pre, Prerelease::new("alpha.2").unwrap());
-        bump_major(&mut version);
+        try_bump_major(&mut version, true);
         assert_eq!(version, version!(0 1 1), "Bump 0.1.1 -> 1.2.0");
         assert!(version > version!("0.1.1-alpha.2"));
+    }
+
+    #[test]
+    #[should_panic]
+    fn bump_major_pre_no_force() {
+        let mut version = version!("0.1.1-alpha.2");
+
+        assert_eq!(version.pre, Prerelease::new("alpha.2").unwrap());
+        try_bump_major(&mut version, false).unwrap();
     }
 }

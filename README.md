@@ -26,14 +26,37 @@
     cargo uv -s 0.2.1
     ```
 
-5. TODO: Bump version 1 patch and set git tag i.e. `0.1.0 -> 0.1.1`
+5. Bump version 1 patch and set git tag i.e. `0.1.0 -> 0.1.1`
 
     ```bash
     cargo uv -t
+    cargo uv -tc "Custom Git message for commit"
     ```
 
-6. TODO: Print version to stdout
+6. Print version to stdout
 
     ```bash
-    cargo uv -p
+    cargo uv -V
+    cargo uv --print
     ```
+
+```text
+Usage: cargo uv [OPTIONS]
+
+Options:
+  -v, --verbose...            Increase logging verbosity
+  -q, --quiet...              Decrease logging verbosity
+  -P, --manifest-path <Path>  Path to the Cargo.toml file.
+  -f, --force-version         Force version bump, this will disregard all version checks.
+  -t, --git-tag               Will run git tag as well.
+  -a, --allow-dirty           Allows git tag to occur in a dirty repo.
+  -c, --message <message>     Message for git commit. Defaults to new version number.
+  -V, --version               Prints the current version of your project then exits.
+  -h, --help                  Print help
+
+Version Change (Choose one):
+  -p, --patch        Increment the version by 1 patch level. [default]
+  -m, --minor        Increment the version by 1 minor level.
+  -M, --major        Increment the version by 1 major level.
+  -s, --set <0.1.1>  Set the version using valid semver.
+```
