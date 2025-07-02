@@ -82,9 +82,7 @@ impl Git {
 
         // TODO: Output of commited files.
         let _stdout = dbg!(git.output().into_diagnostic()?);
-        let mut status = Git::command();
-        status.arg("status");
-        dbg!(status.output());
+
         Ok(())
     }
 

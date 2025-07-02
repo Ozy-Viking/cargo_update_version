@@ -7,7 +7,7 @@ pub(crate) mod manifest;
 
 use std::process::{Child, Command};
 
-use miette::{IntoDiagnostic, bail};
+use miette::{Context, IntoDiagnostic, bail};
 use rusty_viking::MietteDefaultConfig;
 use tracing::{Level, debug, error, info};
 use tracing_subscriber::util::SubscriberInitExt;
@@ -67,7 +67,7 @@ fn main() -> miette::Result<()> {
         Git::commit(&args, &new_version)?;
         Git::tag(&args, &new_version, None)?;
         if args.git_push() {
-            let mut gpjh = Git::push(&args, &new_version)?;
+            let mut gpjh = Git::push(&args, &new_version).context("git push")?;
             join_handles.append(&mut gpjh);
         }
         if args.dry_run() {
@@ -76,7 +76,7 @@ fn main() -> miette::Result<()> {
     }
     Git::is_dirty()?;
     if args.publish() {
-        join_handles.push(Cargo::publish(&args)?);
+        join_handles.push(Cargo::publish(&args).context("Cargo Publish")?);
     }
 
     while !join_handles.is_empty() {
@@ -140,6 +140,7 @@ impl Cargo {
         if cli_args.dry_run() {
             cargo.arg("--dry-run");
         }
+        Git::is_dirty()?;
         // TODO: Add no-verify to flags.
         cargo.args(["--color", "never", "--no-verify", "--quiet"]);
 
