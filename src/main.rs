@@ -135,6 +135,7 @@ impl Cargo {
 
     fn publish(cli_args: &Cli) -> miette::Result<Child> {
         let mut cargo = Cargo::command();
+        cargo.arg("publish");
         if cli_args.dry_run() {
             cargo.arg("--dry-run");
         }
