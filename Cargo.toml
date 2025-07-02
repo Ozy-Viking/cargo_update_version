@@ -1,7 +1,7 @@
 [package]
 name = "cargo-uv"
 authors = ["Zack Hankin <admin@hankin.io>"]
-version = "0.1.17"
+version = "0.2.0"
 edition = "2024"
 readme = "./README.md"
 description = "A simple Cargo tool for updating the version in your project."

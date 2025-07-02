@@ -66,7 +66,7 @@ impl Git {
     pub fn commit(cli_args: &Cli, new_version: &Version) -> miette::Result<()> {
         let mut git = Git::command();
         info!("Creating commit");
-        git.args(["commit", "--short"]);
+        git.args(["commit"]);
 
         if cli_args.dry_run() {
             git.arg("--dry-run");
