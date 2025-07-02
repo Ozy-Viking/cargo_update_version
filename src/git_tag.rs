@@ -79,10 +79,10 @@ impl Git {
                 git.args(["--message", &new_version.to_string()]);
             }
         }
-        dbg!(&git);
+        // dbg!(&git);
 
         // TODO: Output of commited files.
-        let _stdout = dbg!(git.output().into_diagnostic()?);
+        let _stdout = git.output().into_diagnostic()?;
         Git::is_dirty().context("After Commit")?;
         Ok(())
     }

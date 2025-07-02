@@ -8,10 +8,10 @@ use clap::{
     error::ErrorKind,
 };
 
-type VerbosityLevel = clap_verbosity_flag::InfoLevel;
-
 use clap_verbosity_flag::{InfoLevel, Verbosity};
 use rusty_viking::IntoDiagnosticWithLocation;
+
+type VerbosityLevel = clap_verbosity_flag::WarnLevel;
 
 use crate::error::UvError;
 
