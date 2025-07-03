@@ -24,100 +24,109 @@ static FOOTER: &str = "If the bug continues, raise an issue on github: https://g
 fn main() -> miette::Result<()> {
     MietteDefaultConfig::init_set_panic_hook(Some(FOOTER.into()))?;
 
-    let args = dbg!(cli::cli::Cli::parse());
-    let mut meta = args.manifest.metadata();
-    meta.no_deps();
-    dbg!(
-        &meta
-            .exec()
-            .into_diagnostic()?
-            .root_package()
-            .unwrap()
-            .manifest_path
-    );
+    let args = cli::cli::Cli::parse();
+    setup_tracing(&args)?;
+    let meta = args.metadata()?;
+    match args.action() {
+        cli::cli::Action::Patch => {}
+        cli::cli::Action::Minor => todo!(),
+        cli::cli::Action::Major => todo!(),
+        cli::cli::Action::Set => todo!(),
+        cli::cli::Action::Print => {
+            let version = meta
+                .root_package()
+                .ok_or(miette::miette!(
+                    "No root package. Currently only projects with a root package is supported."
+                ))?
+                .version
+                .clone();
+
+            println!("{}", version);
+            return Ok(());
+        }
+    }
 
     return Ok(());
 
-    let args = cli::Cli::parse()?;
-    setup_tracing(&args)?;
+    /*
+        let cargo_manifest = manifest::find_matifest_path(args.manifest_path())?;
+        if args.print_version() {
+            let version = cargo_manifest
+                .get_root_package()
+                .expect("Currently under this belief")
+                .version();
+            print!("{}", version);
+            return Ok(());
+        }
 
-    let cargo_manifest = manifest::find_matifest_path(args.manifest_path())?;
-    if args.print_version() {
-        let version = cargo_manifest
+        if !args.allow_dirty() {
+            Git::is_dirty()?;
+        }
+        let old_version = cargo_manifest
             .get_root_package()
             .expect("Currently under this belief")
             .version();
-        print!("{}", version);
-        return Ok(());
-    }
 
-    if !args.allow_dirty() {
-        Git::is_dirty()?;
-    }
-    let old_version = cargo_manifest
-        .get_root_package()
-        .expect("Currently under this belief")
-        .version();
+        use cli::BumpVersion as BV;
+        let packages = find_matifest_path(args.manifest_path())?;
+        let mut cargo_file = manifest::CargoFile::new(packages.cargo_file_path())?;
+        assert_eq!(&cargo_file.get_root_package_version().unwrap(), old_version);
+        let new_packages = match args.bump_version() {
+            BV::Patch | BV::Minor | BV::Major => manifest::bump_version(&args, cargo_manifest)?,
+            BV::Set(version) => set_version(cargo_manifest, version)?,
+        };
+        let new_version = new_packages
+            .get_root_package_version()
+            .expect("Assuming only root version ops.");
 
-    use cli::BumpVersion as BV;
-    let packages = find_matifest_path(args.manifest_path())?;
-    let mut cargo_file = manifest::CargoFile::new(packages.cargo_file_path())?;
-    assert_eq!(&cargo_file.get_root_package_version().unwrap(), old_version);
-    let new_packages = match args.bump_version() {
-        BV::Patch | BV::Minor | BV::Major => manifest::bump_version(&args, cargo_manifest)?,
-        BV::Set(version) => set_version(cargo_manifest, version)?,
-    };
-    let new_version = new_packages
-        .get_root_package_version()
-        .expect("Assuming only root version ops.");
-
-    cargo_file.set_root_package_version(&new_version)?;
-    if !args.dry_run() {
-        info!("Writing Cargo File");
-        cargo_file.write_cargo_file()?;
-    }
-    let mut join_handles = vec![];
-    if args.git_tag() {
-        info!("Generating git tag");
-        Git::add_cargo_files(&args, packages.cargo_file_path())?;
-        Git::commit(&args, &new_version)?;
-        Git::tag(&args, &new_version, None)?;
-        if args.git_push() {
-            let mut gpjh = Git::push(&args, &new_version).context("git push")?;
-            join_handles.append(&mut gpjh);
+        cargo_file.set_root_package_version(&new_version)?;
+        if !args.dry_run() {
+            info!("Writing Cargo File");
+            cargo_file.write_cargo_file()?;
         }
-        if args.dry_run() {
-            Git::tag(&args, &new_version, Some(vec!["--delete"]))?;
-        }
-    }
-    if args.publish() {
-        join_handles.push(Cargo::publish(&args).context("Cargo Publish")?);
-    }
-
-    while !join_handles.is_empty() {
-        let mut drop_jh = vec![];
-        for (i, join_handle) in &mut join_handles.iter_mut().enumerate() {
-            match join_handle.try_wait() {
-                Ok(Some(es)) => {
-                    drop_jh.push(i);
-                    debug!("Command {} finish with {}", join_handle.id(), es);
-                }
-                Ok(None) => {}
-                Err(e) => {
-                    error!("Error occured while running a command: {}", e)
-                }
+        let mut join_handles = vec![];
+        if args.git_tag() {
+            info!("Generating git tag");
+            Git::add_cargo_files(&args, packages.cargo_file_path())?;
+            Git::commit(&args, &new_version)?;
+            Git::tag(&args, &new_version, None)?;
+            if args.git_push() {
+                let mut gpjh = Git::push(&args, &new_version).context("git push")?;
+                join_handles.append(&mut gpjh);
+            }
+            if args.dry_run() {
+                Git::tag(&args, &new_version, Some(vec!["--delete"]))?;
             }
         }
-
-        for i in drop_jh {
-            join_handles.remove(i).wait().into_diagnostic()?;
+        if args.publish() {
+            join_handles.push(Cargo::publish(&args).context("Cargo Publish")?);
         }
-    }
-    Ok(())
+
+        while !join_handles.is_empty() {
+            let mut drop_jh = vec![];
+            for (i, join_handle) in &mut join_handles.iter_mut().enumerate() {
+                match join_handle.try_wait() {
+                    Ok(Some(es)) => {
+                        drop_jh.push(i);
+                        debug!("Command {} finish with {}", join_handle.id(), es);
+                    }
+                    Ok(None) => {}
+                    Err(e) => {
+                        error!("Error occured while running a command: {}", e)
+                    }
+                }
+            }
+
+            for i in drop_jh {
+                join_handles.remove(i).wait().into_diagnostic()?;
+            }
+        }
+        Ok(())
+    */
 }
 
-fn setup_tracing(args: &Cli) -> miette::Result<()> {
-    let app_level = match args.verbosity().tracing_level() {
+fn setup_tracing(args: &cli::cli::Cli) -> miette::Result<()> {
+    let app_level = match args.tracing_level() {
         Some(l) => l,
         None => bail!(
             help = "Raise issue in github please or try a different verbosity level.",
