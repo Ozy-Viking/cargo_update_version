@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 use std::{env, error::Error, path::PathBuf};
-
+pub mod cli;
 use clap::{
     Arg, ArgAction, Args, FromArgMatches,
     builder::{Styles, ValueParser, styling::AnsiColor},

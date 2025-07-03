@@ -7,6 +7,7 @@ pub(crate) mod manifest;
 
 use std::process::{Child, Command};
 
+use clap::Parser;
 use miette::{Context, IntoDiagnostic, bail};
 use rusty_viking::MietteDefaultConfig;
 use tracing::{Level, debug, error, info};
@@ -22,6 +23,20 @@ static FOOTER: &str = "If the bug continues, raise an issue on github: https://g
 
 fn main() -> miette::Result<()> {
     MietteDefaultConfig::init_set_panic_hook(Some(FOOTER.into()))?;
+
+    let args = dbg!(cli::cli::Cli::parse());
+    let mut meta = args.manifest.metadata();
+    meta.no_deps();
+    dbg!(
+        &meta
+            .exec()
+            .into_diagnostic()?
+            .root_package()
+            .unwrap()
+            .manifest_path
+    );
+
+    return Ok(());
 
     let args = cli::Cli::parse()?;
     setup_tracing(&args)?;
