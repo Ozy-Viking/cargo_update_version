@@ -32,13 +32,13 @@ impl GitFile {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct GitFiles(Vec<GitFile>);
 
 impl GitFiles {
     /// Creates an empty GitFiles object.
     pub fn new() -> Self {
-        GitFiles(Vec::new())
+        Self::default()
     }
 }
 

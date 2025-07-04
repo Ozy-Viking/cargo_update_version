@@ -1,8 +1,5 @@
 pub(crate) mod toml_file;
 
-use std::path::PathBuf;
-
-use cargo_metadata::MetadataCommand;
 use miette::Result;
 use semver::{Prerelease, Version};
 use tracing::{info, instrument, warn};
