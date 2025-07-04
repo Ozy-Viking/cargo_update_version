@@ -3,7 +3,7 @@ use std::fmt::{self, Display, Formatter};
 use miette::Diagnostic;
 use semver::Version;
 
-use crate::cli::BumpVersion;
+use crate::Action;
 
 #[allow(dead_code)]
 #[derive(Debug, thiserror::Error, miette::Diagnostic)]
@@ -59,7 +59,7 @@ impl From<ManifestNotFoundError> for UvError {
 #[derive(Debug, thiserror::Error, Diagnostic)]
 pub struct VersionError {
     pub old_version: semver::Version,
-    pub bump: BumpVersion,
+    pub bump: Action,
     pub msg: String,
     #[help]
     pub help: Option<String>,
@@ -75,7 +75,7 @@ impl std::fmt::Display for VersionError {
 }
 
 impl VersionError {
-    pub fn prerelease_not_empty(old_version: &Version, bump: BumpVersion) -> Self {
+    pub fn prerelease_not_empty(old_version: &Version, bump: Action) -> Self {
         let msg = "Pre-release is not empty.".to_string();
         // TODO: Fix the wording for version error.
         let help = Some(format!(

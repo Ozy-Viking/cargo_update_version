@@ -1,7 +1,6 @@
 use std::{marker::PhantomData, path::Path};
 
 use miette::{IntoDiagnostic, bail};
-// use rusty_viking::IntoDiagnosticWithLocation;
 use semver::Version;
 use toml_edit::DocumentMut;
 use tracing::instrument;
@@ -10,11 +9,11 @@ use crate::current_span;
 
 /// Indicator that the cargo file has been read.
 #[derive(Debug)]
-pub(crate) struct ReadToMemory;
+pub struct ReadToml;
 
 /// Limits what can be done until the file has been read.
 #[derive(Debug)]
-pub(crate) struct NeedToReadToMemory;
+pub struct NeedToReadToml;
 
 #[derive(Debug)]
 pub struct CargoFile<'a, State> {
@@ -23,22 +22,23 @@ pub struct CargoFile<'a, State> {
     __state: PhantomData<State>,
 }
 
-impl<'a> CargoFile<'a, NeedToReadToMemory> {
-    pub fn new(path: &'a Path) -> miette::Result<CargoFile<'a, ReadToMemory>> {
+impl<'a> CargoFile<'a, NeedToReadToml> {
+    #[instrument]
+    pub fn new(path: &'a Path) -> miette::Result<CargoFile<'a, ReadToml>> {
         let ret = Self::new_lazy(path);
         ret.read_file()
     }
 
-    pub fn new_lazy(path: &'a Path) -> CargoFile<'a, NeedToReadToMemory> {
+    pub fn new_lazy(path: &'a Path) -> CargoFile<'a, NeedToReadToml> {
         Self {
             path,
             contents: None,
-            __state: PhantomData::<NeedToReadToMemory>,
+            __state: PhantomData::<NeedToReadToml>,
         }
     }
 
     #[instrument(skip(self), fields(self.path))]
-    pub fn read_file(self) -> miette::Result<CargoFile<'a, ReadToMemory>> {
+    pub fn read_file(self) -> miette::Result<CargoFile<'a, ReadToml>> {
         let contents = match ::std::fs::read_to_string(self.path) {
             Ok(contents) => contents,
             Err(e) => {
@@ -51,11 +51,11 @@ impl<'a> CargoFile<'a, NeedToReadToMemory> {
         Ok(CargoFile {
             path: self.path,
             contents,
-            __state: PhantomData::<ReadToMemory>,
+            __state: PhantomData::<ReadToml>,
         })
     }
 }
-impl<'a> CargoFile<'a, ReadToMemory> {
+impl<'a> CargoFile<'a, ReadToml> {
     #[instrument(skip_all, fields(version))]
     pub fn get_root_package_version(&mut self) -> Option<Version> {
         let span = current_span!();

@@ -5,6 +5,8 @@
 //! 4. Commit just the hunk with version change.
 //! 5. Tag the commit.
 
+pub(crate) mod git_file;
+
 use std::{
     path::Path,
     process::{Child, Command, Output, Stdio},
@@ -14,35 +16,24 @@ use miette::{Context, IntoDiagnostic, bail};
 use semver::Version;
 use tracing::{debug, info, instrument, warn};
 
-use crate::cli::Cli;
+use crate::{cli::Cli, git::git_file::GitFiles};
 
 // TODO: Use the directory of the cargo file maybe /workspace.
 pub struct Git;
 
 impl Git {
+    /// Generates a list of dirty files.
     #[instrument]
-    pub fn is_dirty() -> miette::Result<bool> {
+    pub fn dirty_files() -> miette::Result<GitFiles> {
         let mut git_status = Git::command();
         git_status.args(["status", "--short"]);
         let stdout = git_status.output().into_diagnostic()?.stdout();
-
-        let count = stdout.lines().count();
-        if count == 0 {
-            info!("Git is clean");
-            Ok(true)
-        } else {
-            debug!("Git stage is dirty: {} files", count);
-            miette::bail!(
-                help = "Use '--allow-dirty' to avoid this check.",
-                "{} file/s in the working directory contain changes that were not yet committed into git.{}",
-                count,
-                String::from_iter(
-                    GitFile::parse(stdout)
-                        .unwrap_or_default()
-                        .iter()
-                        .map(|s| "\n  ".to_string() + &s.to_string())
-                )
-            )
+        if stdout.lines().count() == 0 {
+            return Ok(GitFiles::new());
+        };
+        match GitFiles::parse(stdout) {
+            Some(files) => Ok(files),
+            None => Ok(GitFiles::new()),
         }
     }
 
@@ -84,7 +75,7 @@ impl Git {
 
         // TODO: Output of commited files.
         let _stdout = git.output().into_diagnostic()?;
-        Git::is_dirty().context("After Commit")?;
+        Git::dirty_files().context("After Commit")?;
         Ok(())
     }
 
@@ -214,34 +205,5 @@ impl OutputExt for Output {
 
     fn stdout(&self) -> String {
         String::from_iter(self.stdout.iter().map(|&c| char::from(c)))
-    }
-}
-
-#[allow(dead_code)]
-#[derive(Debug)]
-pub struct GitFile {
-    pub mode: String,
-    pub path: String,
-}
-
-impl std::fmt::Display for GitFile {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.path)
-    }
-}
-
-impl GitFile {
-    #[instrument]
-    pub fn parse(input: String) -> Option<Vec<GitFile>> {
-        let lines = input.lines();
-        let mut ret = Vec::new();
-        for line in lines {
-            let (mode, path) = line.trim().split_once(" ")?;
-            ret.push(GitFile {
-                mode: mode.to_string(),
-                path: path.to_string(),
-            });
-        }
-        if ret.is_empty() { None } else { Some(ret) }
     }
 }

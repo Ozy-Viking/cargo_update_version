@@ -3,6 +3,7 @@ use std::{collections::HashMap, fmt::Display, ops::DerefMut, path::PathBuf};
 
 use cargo_metadata::Metadata;
 use semver::Version;
+use tracing::{debug, instrument};
 
 /// Newtype around Package Name.
 #[derive(Debug, Default, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
@@ -48,7 +49,7 @@ impl AsMut<str> for PackageName {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Packages {
     /// File path to the root cargo.toml
     cargo_file_path: PathBuf,
@@ -80,7 +81,9 @@ impl Packages {
         ret
     }
 
+    #[instrument()]
     pub fn cargo_file_path(&self) -> &PathBuf {
+        debug!("Fetching cargo path");
         &self.cargo_file_path
     }
     pub fn drop_root_package_name(&mut self) {

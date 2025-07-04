@@ -126,12 +126,13 @@ dependencies = [
 
 [[package]]
 name = "cargo-uv"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "cargo_metadata",
  "clap",
  "clap-cargo",
  "clap-verbosity-flag",
+ "colorchoice-clap",
  "miette",
  "rusty_viking",
  "semver",
@@ -229,6 +230,16 @@ name = "colorchoice"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b05b61dc5112cbb17e4b6cd61790d9845d13888356391624cbe7e41efeac1e75"
+
+[[package]]
+name = "colorchoice-clap"
+version = "1.0.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0ff31f4fe290e780fe3bbec6b2eb9dbfdccd1630e79a104c221d99243de81493"
+dependencies = [
+ "clap",
+ "colorchoice",
+]
 
 [[package]]
 name = "convert_case"

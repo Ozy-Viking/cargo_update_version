@@ -1,26 +1,22 @@
-mod packages;
-mod toml_file;
+pub(crate) mod toml_file;
 
 use std::path::PathBuf;
 
 use cargo_metadata::MetadataCommand;
 use miette::Result;
 use semver::{Prerelease, Version};
-pub(crate) use toml_file::CargoFile;
 use tracing::{info, instrument, warn};
 
 use crate::{
-    cli::BumpVersion,
-    current_span,
+    Action, Packages, cli, current_span,
     error::{ManifestNotFoundError, VersionError},
-    manifest::packages::Packages,
 };
 
 #[instrument(fields(cargo_file))]
-pub fn find_matifest_path(cli_path: Option<&PathBuf>) -> Result<Packages> {
-    let mut command = MetadataCommand::new();
-    command.no_deps();
-    if let Some(manifest_path) = cli_path {
+pub fn generate_packages(args: &cli::Cli) -> Result<Packages> {
+    let mut cli_path = args.manifest.manifest_path.as_ref();
+    let mut command = args.manifest.metadata();
+    if let Some(manifest_path) = cli_path.as_mut() {
         let mut manifest_path = manifest_path.clone();
         if manifest_path.is_dir() {
             manifest_path.push("Cargo.toml");
@@ -40,7 +36,7 @@ pub fn find_matifest_path(cli_path: Option<&PathBuf>) -> Result<Packages> {
                 CmErr::NoJson => CmErr::NoJson.to_string(),
             };
             msg.retain(|s| s != '\n');
-            let source_code = cli_path.map(|s| {
+            let source_code = cli_path.as_ref().map(|&s| {
                 s.clone()
                     .canonicalize()
                     .unwrap_or(s.clone())
@@ -62,7 +58,7 @@ pub fn find_matifest_path(cli_path: Option<&PathBuf>) -> Result<Packages> {
             unreachable!()
         }
     };
-    let mut packages = packages::Packages::from(&metadata);
+    let mut packages = Packages::from(&metadata);
     let cargo_file = metadata.workspace_root.clone().join("Cargo.toml");
     tracing::Span::current().record("cargo_file", cargo_file.clone().to_string());
     if cargo_file.exists() {
@@ -84,9 +80,8 @@ pub fn find_matifest_path(cli_path: Option<&PathBuf>) -> Result<Packages> {
     Ok(packages)
 }
 
-/// Build metadata is untouched during buming.
 #[instrument(fields(from, to), skip(packages, args))]
-pub(crate) fn bump_version(args: &crate::cli::Cli, mut packages: Packages) -> Result<Packages> {
+pub fn bump_version(args: &crate::cli::Cli, mut packages: Packages) -> Result<Packages> {
     let span = current_span!();
     info!("Bumping Version");
 
@@ -94,12 +89,12 @@ pub(crate) fn bump_version(args: &crate::cli::Cli, mut packages: Packages) -> Re
         span.record("from", root_package.version().to_string());
         info!("Root package name: {}", root_package.name());
         let current_version = root_package.version_mut();
-        use crate::cli::BumpVersion as BumpVer;
-        let new_version = match args.bump_version() {
+        use crate::cli::Action as BumpVer;
+        let new_version = match args.action() {
             BumpVer::Patch => bump_patch(current_version),
-            BumpVer::Minor => try_bump_minor(current_version, args.force())?,
-            BumpVer::Major => try_bump_major(current_version, args.force())?,
-            BumpVer::Set(_) => unreachable!("Already sent to different function."),
+            BumpVer::Minor => try_bump_minor(current_version, args.force_version())?,
+            BumpVer::Major => try_bump_major(current_version, args.force_version())?,
+            _ => unreachable!("Already sent to different function."),
         };
         span.record("to", new_version.to_string());
         info!("Completed version bump!")
@@ -124,7 +119,7 @@ fn try_bump_minor(version: &mut Version, force: bool) -> Result<Version> {
     if !version.pre.is_empty() && !force {
         Err(VersionError::prerelease_not_empty(
             &old_version,
-            BumpVersion::Minor,
+            Action::Minor,
         ))?;
     }
     version.pre = Prerelease::EMPTY;
@@ -138,7 +133,7 @@ fn try_bump_major(version: &mut Version, force: bool) -> Result<Version> {
     if !version.pre.is_empty() && !force {
         Err(VersionError::prerelease_not_empty(
             &old_version,
-            BumpVersion::Minor,
+            Action::Minor,
         ))?;
     }
     version.pre = Prerelease::EMPTY;
@@ -148,8 +143,10 @@ fn try_bump_major(version: &mut Version, force: bool) -> Result<Version> {
     assert!(&old_version < version);
     Ok(version.clone())
 }
+
 #[instrument(skip(packages))]
-pub fn set_version(mut packages: Packages, new_version: &semver::Version) -> Result<Packages> {
+pub fn set_version(mut packages: Packages, args: &cli::Cli) -> Result<Packages> {
+    let new_version = semver::Version::new(0, 1, 1);
     if let Some(root_package) = packages.get_root_package_mut() {
         let version = root_package.version_mut();
         *version = new_version.clone();
