@@ -215,9 +215,9 @@ mod tests {
     fn bump_minor_simple() {
         let mut version = version!(0 1 1);
 
-        try_bump_minor(&mut version, false);
+        try_bump_minor(&mut version, false).unwrap();
         assert_eq!(version, version!(0 2 0), "Bump 0.1.1 -> 0.2.0");
-        try_bump_minor(&mut version, false);
+        try_bump_minor(&mut version, false).unwrap();
         assert_eq!(version, version!(0 3 0), "Bump 0.2.0 -> 0.3.0");
     }
 
@@ -226,8 +226,8 @@ mod tests {
         let mut version = version!("0.1.1-alpha.2");
 
         assert_eq!(version.pre, Prerelease::new("alpha.2").unwrap());
-        try_bump_minor(&mut version, true);
-        assert_eq!(version, version!(0 1 1), "Bump 0.1.1-alpha.2 -> 0.2.0");
+        try_bump_minor(&mut version, true).unwrap();
+        assert_eq!(version, version!(0 2 0), "Bump 0.1.1-alpha.2 -> 0.2.0");
         assert!(version > version!("0.1.1-alpha.2"));
     }
     #[test]
@@ -240,23 +240,25 @@ mod tests {
     }
 
     #[test]
-    fn bump_major_simple() {
+    fn bump_major_simple() -> miette::Result<()> {
         let mut version = version!(0 1 1);
 
-        try_bump_major(&mut version, false);
+        try_bump_major(&mut version, false)?;
         assert_eq!(version, version!(1 0 0), "Bump 0.1.1 -> 1.0.0");
-        try_bump_major(&mut version, false);
+        try_bump_major(&mut version, false)?;
         assert_eq!(version, version!(2 0 0), "Bump 1.0.0 -> 2.0.0");
+        Ok(())
     }
 
     #[test]
-    fn bump_major_pre() {
+    fn bump_major_pre() -> miette::Result<()> {
         let mut version = version!("0.1.1-alpha.2");
 
         assert_eq!(version.pre, Prerelease::new("alpha.2").unwrap());
-        try_bump_major(&mut version, true);
-        assert_eq!(version, version!(0 1 1), "Bump 0.1.1 -> 1.2.0");
+        try_bump_major(&mut version, true)?;
+        assert_eq!(version, version!(2 0 0), "Bump 0.1.1 -> 2.0.0");
         assert!(version > version!("0.1.1-alpha.2"));
+        Ok(())
     }
 
     #[test]

@@ -7,70 +7,32 @@ This is a work in progress.
 
 ## Usage
 
-1. Bump version 1 patch i.e. `0.1.0 -> 0.1.1`
-
-    ```bash
-    cargo uv 
-    ```
-
-2. Bump version 1 minor i.e. `0.1.3 -> 0.2.0`
-
-    ```bash
-    cargo uv -m
-    ```
-
-3. Bump version 1 major i.e. `0.2.3 -> 1.0.0`
-
-    ```bash
-    cargo uv -M
-    ```
-
-4. Set version
-
-    ```bash
-    cargo uv -s 0.2.1
-    ```
-
-5. Bump version 1 patch and set git tag i.e. `0.1.0 -> 0.1.1`
-
-    ```bash
-    cargo uv -t
-    cargo uv -tc "Custom Git message for commit"
-    ```
-
-6. Print version to stdout
-
-    ```bash
-    cargo uv -V
-    cargo uv --print
-    ```
-
-7. Bump version, tag, push and publish
-
-    ```bash
-    cargo uv -t --push --publish
-    ```
-
 ```text
-Usage: cargo uv [OPTIONS]
+A simple Cargo tool for updating the version in your project.
+
+Usage: cargo uv [OPTIONS] [ACTION] [SET_VERSION]
+
+Arguments:
+  [ACTION]       Action to affect the package version [default: patch] [possible values: patch, minor, major, set, print]
+  [SET_VERSION]  New version to set. Ignored if action isn't set
 
 Options:
+  -c, --cargo-publish         Runs the `cargo publish`
+      --pre <PRE>             Sets the pre-release segment for the new version.
+      --build <BUILD>         Sets the build metadata for the new version.
+  -n, --allow-dirty           Allows git tag to occur in a dirty repo.
+      --color <WHEN>          Controls when to use color [default: auto] [possible values: auto, always, never]
+      --manifest-path <PATH>  Path to Cargo.toml
+  -f, --force-version         Bypass version bump checks.
   -v, --verbose...            Increase logging verbosity
   -q, --quiet...              Decrease logging verbosity
-  -P, --manifest-path <Path>  Path to the Cargo.toml file.
-  -f, --force-version         Force version bump, this will disregard all version checks.
-  -t, --git-tag               Will run git tag as well.
-  -a, --allow-dirty           Allows git tag to occur in a dirty repo.
-  -c, --message <message>     Message for git commit. Defaults to new version number.
-  -V, --version               Prints the current version of your project then exits.
-  -n, --dry-run               Does a dry-run, will create a tag but then deletes it.
-      --push                  Pushes the tag to all remotes of the current branch not just origin.
-      --publish               Runs cargo publish. Allow dirty is required here.
+  -d, --dry-run               Allows git tag to occur in a dirty repo.
   -h, --help                  Print help (see more with '--help')
+  -V, --version               Print version
 
-Version Change (Choose one):
-  -p, --patch        Increment the version by 1 patch level. [default selection]
-  -m, --minor        Increment the version by 1 minor level.
-  -M, --major        Increment the version by 1 major level.
-  -s, --set <0.3.2>  Set the version using valid semver.
+Git:
+  -t, --git-tag            Create a git tag.
+      --git-push           Push tag to the branch's remote repositries.
+  -m, --message <MESSAGE>  Message for git commit. Default to git tag.
+      --force-git          Pass force into all git operations.
 ```

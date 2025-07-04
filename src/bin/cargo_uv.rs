@@ -15,11 +15,12 @@ fn main() -> Result<()> {
     let input = args().filter(|a| a != "uv").collect::<Vec<_>>();
     MietteDefaultConfig::init_set_panic_hook(Some(FOOTER.into()))?;
     let mut cli = Cli::command();
-    cli = cli.mut_arg("new_version", |a| {
+    cli = cli.mut_arg("set_version", |a| {
         a.conflicts_with("action")
             .required_if_eq("action", Action::Set)
     });
     cli.set_bin_name("cargo uv");
+    cli = cli.next_line_help(false);
 
     let args = Cli::from_arg_matches(&cli.get_matches_from(&input)).into_diagnostic()?;
 
