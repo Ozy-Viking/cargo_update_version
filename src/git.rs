@@ -19,6 +19,7 @@ use tracing::{debug, info, instrument, warn};
 use crate::{cli::Cli, git::git_file::GitFiles};
 
 // TODO: Use the directory of the cargo file maybe /workspace.
+// TODO: Push branch as well as flag.
 pub struct Git;
 
 impl Git {

@@ -102,5 +102,7 @@ fn main() -> Result<()> {
             join_handles.remove(i).wait().into_diagnostic()?;
         }
     }
+
+    println!("{}", new_version);
     Ok(())
 }

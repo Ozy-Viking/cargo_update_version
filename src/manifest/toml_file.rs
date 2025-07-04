@@ -75,10 +75,6 @@ impl<'a> CargoFile<'a, ReadToml> {
         if let Some(version) = package_table.get_mut("version") {
             let version_val = version.as_value_mut().unwrap();
             *version_val = new_version.to_string().into();
-            // TODO: Add a flag to enable comment.
-            // version_val
-            //     .decor_mut()
-            //     .set_suffix(" # Modified by cargo-uv");
         }
         Ok(())
     }
