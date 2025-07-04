@@ -23,7 +23,6 @@ fn main() -> Result<()> {
 
     let args = Cli::from_arg_matches(&cli.get_matches_from(&input)).into_diagnostic()?;
 
-    dbg!(&args.set_version);
     setup_tracing(&args)?;
     args.try_allow_dirty()?;
     let meta = args.metadata()?;
