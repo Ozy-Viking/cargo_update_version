@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo "It works ${{input.version}}"
-        if: ${{ input.version }}
+        if: ${{ inputs.version }}
 
   # create-release:
   #   runs-on: ubuntu-latest
