@@ -25,6 +25,8 @@ jobs:
       - run: echo "It works ${{ inputs.version }}"
         if: ${{ inputs.version }}
 
+      - run: echo "still works"
+
   # create-release:
   #   runs-on: ubuntu-latest
   #   steps:
