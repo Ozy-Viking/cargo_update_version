@@ -22,7 +22,7 @@ jobs:
   testing:
     runs-on: ubuntu-latest
     steps:
-      - run: echo "It works ${{input.version}}"
+      - run: echo "It works ${{ inputs.version }}"
         if: ${{ inputs.version }}
 
   # create-release:
