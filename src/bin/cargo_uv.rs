@@ -1,7 +1,7 @@
 use std::env::args;
 
 use cargo_uv::{
-    Action, Cargo, CargoFile, Cli, FOOTER, Git, GitBuilder, Packages, Result, bump_version,
+    Action, Cargo, CargoFile, Cli, FOOTER, GitBuilder, Packages, Result, bump_version,
     generate_packages, set_version, setup_tracing,
 };
 use clap::CommandFactory;
