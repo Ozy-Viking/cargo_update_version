@@ -1,3 +1,4 @@
+#[allow(clippy::module_inception)]
 pub(crate) mod git;
 pub(crate) mod git_file;
 

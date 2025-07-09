@@ -94,7 +94,7 @@ impl Git<PathBuf> {
     fn command(&self) -> Command {
         let mut cmd = Command::new("git");
         cmd.arg("-C")
-            .arg(&self.root_directory.clone().into_os_string());
+            .arg(self.root_directory.clone().into_os_string());
         tracing::info!("Command: {:#?}", &cmd);
         cmd
     }
