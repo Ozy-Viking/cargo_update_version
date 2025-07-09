@@ -1,8 +1,8 @@
 use std::env::args;
 
 use cargo_uv::{
-    Action, Cargo, CargoFile, Cli, FOOTER, Git, Packages, Result, bump_version, generate_packages,
-    set_version, setup_tracing,
+    Action, Cargo, CargoFile, Cli, FOOTER, Git, GitBuilder, Packages, Result, bump_version,
+    generate_packages, set_version, setup_tracing,
 };
 use clap::CommandFactory;
 use miette::{Context, IntoDiagnostic};
@@ -66,17 +66,19 @@ fn main() -> Result<()> {
     let mut join_handles = vec![];
     if args.git_tag() {
         info!("Generating git tag");
+        let root_dir = args.root_dir()?;
+        let git = GitBuilder::new().root_directory(root_dir).build();
 
         // TODO: Test to see if in different repo as manifest-path.
-        Git::add_cargo_files(&args, new_packages.cargo_file_path())?;
-        Git::commit(&args, &new_version)?;
-        Git::tag(&args, &new_version, None)?;
+        git.add_cargo_files(new_packages.cargo_file_path())?;
+        git.commit(&args, &new_version)?;
+        git.tag(&args, &new_version, None)?;
         if args.git_push() {
-            let mut gpjh = Git::push(&args, &new_version).context("git push")?;
+            let mut gpjh = git.push(&args, &new_version).context("git push")?;
             join_handles.append(&mut gpjh);
         }
         if args.dry_run() {
-            Git::tag(&args, &new_version, Some(vec!["--delete"]))?;
+            git.tag(&args, &new_version, Some(vec!["--delete"]))?;
         }
     }
     if args.cargo_publish() {

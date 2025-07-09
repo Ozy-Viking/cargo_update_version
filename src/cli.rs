@@ -1,6 +1,6 @@
-use std::ffi::OsString;
+use std::{ffi::OsString, path::PathBuf};
 
-use crate::Result;
+use crate::{GitBuilder, Result};
 use cargo_metadata::Metadata;
 use clap::builder::OsStr;
 use miette::IntoDiagnostic;
@@ -8,7 +8,7 @@ use rusty_viking::EnumDisplay;
 use semver::Version;
 use tracing::{Level, debug, instrument};
 
-use crate::{current_span, git::Git};
+use crate::current_span;
 
 static GIT_HEADER: &str = "Git";
 pub const CLAP_STYLING: clap::builder::styling::Styles = clap::builder::styling::Styles::styled()
@@ -32,6 +32,10 @@ pub struct Cli {
     #[arg(short, long)]
     pub cargo_publish: bool,
 
+    /// adds 'no_verify' to cargo publish command.
+    #[arg(long)]
+    pub no_verify: bool,
+
     #[arg(long, help="Sets the pre-release segment for the new version.", value_parser = semver::Prerelease::new)]
     pub pre: Option<semver::Prerelease>,
 
@@ -44,10 +48,11 @@ pub struct Cli {
     #[command(flatten)]
     pub git_ops: GitOps,
 
+    /// All commands run as if they run in the the directory of the Cargo.toml set.
     #[command(flatten)]
     pub manifest: clap_cargo::Manifest,
 
-    // TODO: Add workplace
+    // TODO: Add workplace functionality
     // #[command(flatten)]
     // workspace: clap_cargo::Workspace,
     #[arg(short, long, help = "Bypass version bump checks.")]
@@ -116,6 +121,22 @@ impl From<Action> for OsStr {
 }
 
 impl Cli {
+    pub fn root_dir(&self) -> Result<PathBuf> {
+        let root = match self.manifest.manifest_path.clone() {
+            Some(p) => p
+                .canonicalize()
+                .into_diagnostic()?
+                .parent()
+                .map(|p| p.to_path_buf())
+                .ok_or_else(|| {
+                    miette::miette!("Failed to canonicaliaze correctly: {}", &p.display())
+                })?,
+            None => PathBuf::from("."),
+        };
+        tracing::info!("Root: {}", &root.display());
+        Ok(root)
+    }
+
     #[instrument(skip_all, fields(root_cargo_file), name = "Cli::metadata")]
     pub fn metadata(&self) -> Result<Metadata> {
         let mut cmd = self.manifest.metadata();
@@ -150,7 +171,8 @@ impl Cli {
         if self.allow_dirty {
             return Ok(());
         }
-        let files = Git::dirty_files()?;
+        let git = GitBuilder::new().root_directory(self.root_dir()?).build();
+        let files: crate::GitFiles = git.dirty_files()?;
         let count = files.len();
 
         if count != 0 {
@@ -206,5 +228,9 @@ impl Cli {
         current_span!().record("cargo_publish", publish);
         debug!("Checking for cargo publish flag...");
         publish
+    }
+
+    pub fn no_verify(&self) -> bool {
+        self.no_verify
     }
 }

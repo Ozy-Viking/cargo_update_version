@@ -71,7 +71,7 @@ impl AsMut<Vec<GitFile>> for GitFiles {
 impl std::fmt::Display for GitFiles {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for file in self.0.iter() {
-            writeln!(f, "{}", file)?;
+            write!(f, "\n{}", file)?;
         }
         Ok(())
     }

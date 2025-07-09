@@ -9,10 +9,7 @@ pub(crate) mod packages;
 
 pub use cargo::Cargo;
 pub use cli::{Action, Cli};
-pub use git::{
-    Git,
-    git_file::{GitFile, GitFiles},
-};
+pub use git::{Git, GitBuilder, GitFile, GitFiles, NoRootDirSet, OutputExt};
 pub use manifest::toml_file::{CargoFile, NeedToReadToml, ReadToml};
 pub use manifest::{bump_version, generate_packages, set_version};
 pub use miette::Result;
