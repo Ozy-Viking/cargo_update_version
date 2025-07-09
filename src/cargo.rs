@@ -33,9 +33,6 @@ impl Cargo {
             cargo.arg("--no-verify");
         }
 
-        if cli_args.dry_run() {
-            cargo.arg("--dry-run");
-        }
         cargo.args(["--color", "never", "--quiet", "--allow-dirty"]);
 
         cargo.spawn().into_diagnostic()
