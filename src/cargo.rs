@@ -1,4 +1,4 @@
-use std::process::{Child, Command};
+use std::process::{Child, Command, Stdio};
 
 use miette::IntoDiagnostic;
 
@@ -7,7 +7,9 @@ use crate::{GitBuilder, cli::Cli};
 pub struct Cargo;
 impl Cargo {
     pub fn command() -> Command {
-        Command::new("cargo")
+        let mut cargo = Command::new("cargo");
+        cargo.stdin(Stdio::piped());
+        cargo
     }
 
     pub fn publish(cli_args: &Cli) -> miette::Result<Child> {
