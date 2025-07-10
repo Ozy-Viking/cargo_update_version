@@ -105,7 +105,7 @@ impl Git<PathBuf> {
 
     #[instrument(skip_all)]
     pub fn add_cargo_files(&self, cargo_file: &Path) -> miette::Result<()> {
-        let mut git = self.command(true);
+        let mut git = self.command(false);
         let cargo_lock = cargo_file
             .to_path_buf()
             .parent()
