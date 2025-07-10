@@ -143,7 +143,10 @@ fn try_bump_major(version: &mut Version, force: bool) -> Result<Version> {
 
 #[instrument(skip(packages))]
 pub fn set_version(mut packages: Packages, args: &cli::Cli) -> Result<Packages> {
-    let new_version = semver::Version::new(0, 1, 1);
+    let new_version = args
+        .set_version
+        .as_ref()
+        .ok_or_else(|| miette::miette!("Called set_version with args containing version"))?;
     if let Some(root_package) = packages.get_root_package_mut() {
         let version = root_package.version_mut();
         *version = new_version.clone();
