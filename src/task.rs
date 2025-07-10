@@ -3,6 +3,7 @@ use std::{
     process::{Child, ExitStatus, Output},
 };
 
+use semver::Version;
 use tracing::{info, instrument};
 
 use crate::{OutputExt, current_span};
@@ -64,6 +65,7 @@ pub enum Task {
     Print,
     Set,
     Bump(BumpType),
+    DeleteGitTag(Version),
 }
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]

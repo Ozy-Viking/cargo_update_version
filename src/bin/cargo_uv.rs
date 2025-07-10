@@ -75,6 +75,7 @@ fn main() -> Result<()> {
             tasks.append(gpjh);
         }
 
+        // BUG: #2 Deletes tag before push so push fails.
         if args.dry_run() {
             git.tag(&args, &new_version, Some(vec!["--delete"]))?;
         }
