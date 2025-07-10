@@ -68,6 +68,7 @@ fn main() -> Result<()> {
         let git = GitBuilder::new().root_directory(root_dir).build();
 
         git.add_cargo_files(new_packages.cargo_file_path())?;
+        todo!();
         git.commit(&args, &new_version)?;
         git.tag(&args, &new_version, None)?;
         if args.git_push() {
