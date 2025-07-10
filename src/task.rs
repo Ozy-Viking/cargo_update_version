@@ -198,7 +198,7 @@ impl TaskError {
 }
 
 #[derive(Debug, thiserror::Error, miette::Diagnostic)]
-#[error("{msg}")]
+#[error("{output}")]
 #[diagnostic(code(TaskError))]
 pub struct TaskError {
     pub completed_tasks: Vec<Task>,
@@ -206,6 +206,7 @@ pub struct TaskError {
     pub errored_task: Task,
     pub output: String,
     pub status_code: Option<ExitStatus>,
+    #[help]
     pub msg: String,
 }
 

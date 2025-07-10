@@ -9,7 +9,7 @@ use miette::{Context, IntoDiagnostic, bail};
 use semver::Version;
 use tracing::{debug, info, instrument, warn};
 
-use crate::{Task, cli::Cli, git::git_file::GitFiles};
+use crate::{Task, cli::Cli, current_span, git::git_file::GitFiles};
 
 /// Used to indicate if the Root Dir is Set and can be used.
 #[derive(Debug)]
@@ -187,8 +187,9 @@ impl Git<PathBuf> {
     }
 
     /// Pushed just the tag to the remotes
-    #[instrument(skip_all)]
+    #[instrument(skip_all, fields(dry_run))]
     pub fn push(&self, cli_args: &Cli, version: &Version) -> miette::Result<Vec<(Task, Child)>> {
+        current_span!().record("dry_run", cli_args.dry_run());
         let tag_string = String::from("tags/") + &self.generate_tag(version);
         let join = self
             .remotes()?
