@@ -59,6 +59,8 @@ fn main() -> Result<()> {
         cargo_file.write_cargo_file()?;
     }
 
+    let _new_manifest = args.metadata()?;
+
     let mut tasks = Tasks::new();
     if args.git_tag() {
         info!("Generating git tag");

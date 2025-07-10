@@ -39,7 +39,7 @@ impl Cargo {
         }
 
         // TODO: Be able to remove --allow-dirty
-        cargo.args(["--allow-dirty"]);
+        // cargo.args(["--allow-dirty"]);
         tracing::trace!("About to run: {:?}", &cargo);
         cargo.spawn().into_diagnostic()
     }
