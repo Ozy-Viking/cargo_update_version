@@ -31,25 +31,27 @@ Arguments:
   [SET_VERSION]  New version to set. Ignored if action isn't set
 
 Options:
-      --color <WHEN>          Controls when to use color [default: auto] [possible values: auto, always, never]
-  -Q, --supress-stdout        Suppresses stdout out from cargo commands run
-  -c, --cargo-publish         Runs the `cargo publish`
-      --no-verify             adds 'no_verify' to cargo publish command
       --pre <PRE>             Sets the pre-release segment for the new version.
       --build <BUILD>         Sets the build metadata for the new version.
-  -n, --allow-dirty           Allows git tag to occur in a dirty repo.
+  -n, --allow-dirty           Allows program to work in a dirty repo.
       --manifest-path <PATH>  Path to Cargo.toml
   -f, --force-version         Bypass version bump checks.
+  -d, --dry-run               Allows git tag to occur in a dirty repo.
+      --color <WHEN>          Controls when to use color [default: auto] [possible values: auto, always, never]
   -v, --verbose...            Increase logging verbosity
   -q, --quiet...              Decrease logging verbosity
-  -d, --dry-run               Allows git tag to occur in a dirty repo.
   -h, --help                  Print help (see more with '--help')
   -V, --version               Print version
+
+Cargo:
+  -c, --cargo-publish   Runs the `cargo publish`
+  -Q, --supress-stdout  Suppresses stdout out from cargo commands run
+      --no-verify       adds 'no_verify' to cargo publish command
 
 Git:
   -t, --git-tag            Create a git tag.
       --git-push           Push tag to the branch's remote repositries.
   -m, --message <MESSAGE>  Message for git commit. Default to git tag.
       --force-git          Pass force into all git operations.
-      --git-supress        Suppresses stdout out from cargo commands run
+      --git-supress        Suppresses stdout out from git commands run
 ```
