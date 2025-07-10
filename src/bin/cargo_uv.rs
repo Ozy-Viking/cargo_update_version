@@ -49,7 +49,6 @@ fn main() -> Result<()> {
         .expect("Only dealing with root packages.")
         .version()
         .clone();
-    dbg!(&new_version);
 
     let mut cargo_file = CargoFile::new(new_packages.cargo_file_path())?;
 
