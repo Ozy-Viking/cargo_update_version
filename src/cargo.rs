@@ -16,6 +16,7 @@ impl Cargo {
         } else {
             cargo.stdout(Stdio::piped());
         }
+        cargo.stderr(Stdio::piped());
         cargo
     }
 
@@ -38,8 +39,8 @@ impl Cargo {
             cargo.arg("--no-verify");
         }
 
-        // TODO: Be able to remove --allow-dirty
-        // cargo.args(["--allow-dirty"]);
+        // BUG: Be able to remove --allow-dirty #1
+        cargo.args(["--allow-dirty"]);
         tracing::trace!("About to run: {:?}", &cargo);
         cargo.spawn().into_diagnostic()
     }

@@ -59,7 +59,7 @@ fn main() -> Result<()> {
         cargo_file.write_cargo_file()?;
     }
 
-    let _new_manifest = args.metadata()?;
+    // let _new_manifest = args.metadata()?;
 
     let mut tasks = Tasks::new();
     if args.git_tag() {
@@ -69,18 +69,16 @@ fn main() -> Result<()> {
 
         git.add_cargo_files(new_packages.cargo_file_path())?;
         git.commit(&args, &new_version)?;
-        args.try_allow_dirty().context("line 72")?;
         git.tag(&args, &new_version, None)?;
         if args.git_push() {
             let gpjh = git.push(&args, &new_version).context("git push")?;
             tasks.append(gpjh);
         }
-        args.try_allow_dirty().context("line 78")?;
+
         if args.dry_run() {
             git.tag(&args, &new_version, Some(vec!["--delete"]))?;
         }
     }
-    args.try_allow_dirty().context("line 83")?;
     if args.cargo_publish() {
         tasks.insert(
             cargo_uv::Task::Publish,

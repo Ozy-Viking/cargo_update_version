@@ -85,6 +85,7 @@ impl Git<NoRootDirSet> {
         if !quiet {
             cmd.stdout(Stdio::inherit());
         }
+        cmd.stderr(Stdio::piped());
         cmd
     }
 }
@@ -97,9 +98,8 @@ impl Git<PathBuf> {
         cmd.arg("-C")
             .arg(self.root_directory.clone().into_os_string());
         tracing::info!("Command: {:#?}", &cmd);
-        if !quiet {
-            cmd.stdout(Stdio::inherit());
-        }
+        if !quiet {}
+        cmd.stderr(Stdio::piped());
         cmd
     }
 
@@ -162,11 +162,11 @@ impl Git<PathBuf> {
     #[instrument(skip_all)]
     pub fn tag(
         &self,
-        _cli_args: &Cli,
+        cli_args: &Cli,
         version: &Version,
         args: Option<Vec<&str>>,
     ) -> miette::Result<()> {
-        let mut git = self.command(true);
+        let mut git = self.command(cli_args.git_ops.git_supress);
         git.arg("tag");
         if let Some(a) = args {
             git.args(a);
