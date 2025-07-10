@@ -1,6 +1,3 @@
-#[cfg(not(windows))]
-use std::os::unix::process::ExitStatusExt;
-
 use std::{
     collections::{HashMap, HashSet},
     process::{Child, ExitStatus, Output},
@@ -38,7 +35,7 @@ impl Tasks {
     pub fn incomplete_tasks(&self) -> Vec<Task> {
         self.tasks
             .keys()
-            .filter(|k| !self.completed.contains(k))
+            .filter(|&k| !self.completed.contains(k))
             .cloned()
             .collect()
     }
@@ -52,7 +49,7 @@ impl Tasks {
 
     /// [bool] if remaining tasks exist based on [self.incomplete_tasks].
     pub fn remaining_tasks(&self) -> bool {
-        self.incomplete_tasks().len() > 0
+        !self.incomplete_tasks().is_empty()
     }
 
     pub fn remaining_tasks_left(&self) -> usize {
@@ -64,6 +61,16 @@ impl Tasks {
 pub enum Task {
     Push(String),
     Publish,
+    Print,
+    Set,
+    Bump(BumpType),
+}
+
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
+pub enum BumpType {
+    Patch,
+    Minor,
+    Major,
 }
 
 impl std::ops::Deref for Tasks {
@@ -194,10 +201,12 @@ impl TaskError {
 #[error("{msg}")]
 #[diagnostic(code(TaskError))]
 pub struct TaskError {
-    completed_tasks: Vec<Task>,
-    incomplete_tasks: Vec<Task>,
-    errored_task: Task,
-    output: String,
-    status_code: Option<ExitStatus>,
-    msg: String,
+    pub completed_tasks: Vec<Task>,
+    pub incomplete_tasks: Vec<Task>,
+    pub errored_task: Task,
+    pub output: String,
+    pub status_code: Option<ExitStatus>,
+    pub msg: String,
 }
+
+// TODO: Add tests to tasks.

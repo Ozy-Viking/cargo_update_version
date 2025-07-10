@@ -11,9 +11,6 @@ use tracing::{debug, info, instrument, warn};
 
 use crate::{Task, cli::Cli, git::git_file::GitFiles};
 
-// TODO: Use the directory of the cargo file maybe /workspace.
-// TODO: Push branch as well as flag.
-
 /// Used to indicate if the Root Dir is Set and can be used.
 #[derive(Debug)]
 pub struct NoRootDirSet;
@@ -141,7 +138,7 @@ impl Git<PathBuf> {
 
     #[instrument(skip_all)]
     pub fn commit(&self, cli_args: &Cli, new_version: &Version) -> miette::Result<()> {
-        let mut git = self.command(cli_args.supress_stdout);
+        let mut git = self.command(cli_args.git_ops.git_supress);
         info!("Creating commit");
         git.args(["commit"]);
 
@@ -169,14 +166,6 @@ impl Git<PathBuf> {
         version: &Version,
         args: Option<Vec<&str>>,
     ) -> miette::Result<()> {
-        // if cli_args.dry_run() {
-        //     info!(
-        //         dry_run = true,
-        //         "Would of taged: {}",
-        //         Git::generate_tag(version)
-        //     );
-        //     return Ok(());
-        // }
         let mut git = self.command(true);
         git.arg("tag");
         if let Some(a) = args {
@@ -207,7 +196,7 @@ impl Git<PathBuf> {
             .map(|remote| {
                 let task = Task::Push(remote.clone());
                 info!("Pushing to remote: {remote}");
-                let mut git_push = self.command(cli_args.supress_stdout);
+                let mut git_push = self.command(cli_args.git_ops.git_supress);
                 git_push.arg("push");
                 if cli_args.dry_run() {
                     git_push.arg("--dry-run");

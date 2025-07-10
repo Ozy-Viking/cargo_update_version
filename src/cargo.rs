@@ -29,8 +29,6 @@ impl Cargo {
             .root_directory(cli_args.root_dir()?)
             .build();
         git.dirty_files()?;
-        // TODO: Add no-verify to flags.
-        // TODO: Be able to remove --allow-dirty
         if cli_args.manifest.manifest_path.is_some() {
             cargo
                 .arg("--manifest-path")
@@ -40,6 +38,7 @@ impl Cargo {
             cargo.arg("--no-verify");
         }
 
+        // TODO: Be able to remove --allow-dirty
         cargo.args(["--allow-dirty"]);
         tracing::trace!("About to run: {:?}", &cargo);
         cargo.spawn().into_diagnostic()

@@ -26,7 +26,6 @@ fn main() -> Result<()> {
     let meta = args.metadata()?;
 
     let current_packages: Packages = generate_packages(&args)?;
-    let _current_root_package = current_packages.get_root_package_owned().unwrap();
 
     let new_packages = match args.action() {
         Action::Set => set_version(current_packages, &args)?,
@@ -84,8 +83,15 @@ fn main() -> Result<()> {
         );
     }
 
-    tasks.join_all()?;
-
-    println!("{}", new_version);
-    Ok(())
+    match tasks.join_all() {
+        Ok(_ts) => {
+            println!("{}", new_version);
+            Ok(())
+        }
+        Err(e) => {
+            tracing::warn!("Tasks errored, Completed tasks: {:?}", e.completed_tasks);
+            tracing::warn!("Tasks with unknown status: {:?}", e.incomplete_tasks);
+            Err(e.into())
+        }
+    }
 }

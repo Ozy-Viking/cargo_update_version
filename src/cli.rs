@@ -11,6 +11,8 @@ use tracing::{Level, debug, instrument};
 use crate::current_span;
 
 static GIT_HEADER: &str = "Git";
+static CARGO_HEADER: &str = "Cargo";
+
 pub const CLAP_STYLING: clap::builder::styling::Styles = clap::builder::styling::Styles::styled()
     .header(clap_cargo::style::HEADER)
     .usage(clap_cargo::style::USAGE)
@@ -28,25 +30,26 @@ pub struct Cli {
     #[arg(default_value_t = Action::default())]
     pub action: Action,
 
-    /// Suppresses stdout out from commands run.
-    #[arg(short = 'Q', long)]
-    pub supress_stdout: bool,
-
-    /// Runs the `cargo publish`
-    #[arg(short, long)]
-    pub cargo_publish: bool,
-
-    /// adds 'no_verify' to cargo publish command.
-    #[arg(long)]
-    pub no_verify: bool,
-
     #[arg(long, help="Sets the pre-release segment for the new version.", value_parser = semver::Prerelease::new)]
     pub pre: Option<semver::Prerelease>,
 
     #[arg(long, help = "Sets the build metadata for the new version.")]
     pub build: Option<semver::BuildMetadata>,
 
-    #[arg(short = 'n', long, help = "Allows git tag to occur in a dirty repo.")]
+    /// Runs the `cargo publish`
+    #[arg(short, long, help_heading = CARGO_HEADER)]
+    pub cargo_publish: bool,
+
+    // TODO: turn supress into value enum.
+    /// Suppresses stdout out from cargo commands run.
+    #[arg(short = 'Q', long, help_heading = CARGO_HEADER)]
+    pub supress_stdout: bool,
+
+    /// adds 'no_verify' to cargo publish command.
+    #[arg(long, help_heading = CARGO_HEADER)]
+    pub no_verify: bool,
+
+    #[arg(short = 'n', long, help = "Allows program to work in a dirty repo.")]
     pub allow_dirty: bool,
 
     #[command(flatten)]
@@ -62,11 +65,14 @@ pub struct Cli {
     #[arg(short, long, help = "Bypass version bump checks.")]
     pub force_version: bool,
 
-    #[command(flatten)]
-    pub verbosity: clap_verbosity_flag::Verbosity,
-
     #[arg(short, long, help = "Allows git tag to occur in a dirty repo.")]
     pub dry_run: bool,
+
+    #[command(flatten)]
+    pub color: colorchoice_clap::Color,
+
+    #[command(flatten)]
+    pub verbosity: clap_verbosity_flag::Verbosity,
 
     /// New version to set. Ignored if action isn't set.
     #[arg(value_parser = Version::parse)]
@@ -97,8 +103,11 @@ pub struct GitOps {
     #[arg(long = "force-git", help = "Pass force into all git operations.",
         help_heading = GIT_HEADER)]
     pub force: bool,
-    #[command(flatten)]
-    color: colorchoice_clap::Color,
+
+    /// Suppresses stdout out from git commands run.
+    #[arg(long,
+        help_heading = GIT_HEADER)]
+    pub git_supress: bool,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, clap::ValueEnum, Default, EnumDisplay)]
