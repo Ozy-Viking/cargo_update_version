@@ -16,7 +16,6 @@ impl Cargo {
         } else {
             cargo.stdout(Stdio::piped());
         }
-        cargo.stderr(Stdio::piped());
         cargo
     }
 

@@ -85,7 +85,7 @@ impl Git<NoRootDirSet> {
         if !quiet {
             cmd.stdout(Stdio::inherit());
         }
-        cmd.stderr(Stdio::piped());
+        // cmd.stderr(Stdio::piped());
         cmd
     }
 }
@@ -98,8 +98,9 @@ impl Git<PathBuf> {
         cmd.arg("-C")
             .arg(self.root_directory.clone().into_os_string());
         tracing::info!("Command: {:#?}", &cmd);
-        if !quiet {}
-        cmd.stderr(Stdio::piped());
+        if !quiet {
+            cmd.stdout(Stdio::inherit());
+        }
         cmd
     }
 
