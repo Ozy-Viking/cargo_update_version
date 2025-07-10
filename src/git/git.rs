@@ -115,7 +115,7 @@ impl Git<PathBuf> {
             .to_string();
         let cargo_toml = cargo_file.display().to_string();
         info!("Staging cargo files: {}, {}", cargo_toml, cargo_lock);
-        git.args(["add", &cargo_toml, &cargo_lock]);
+        git.args(["add", "-v", &cargo_toml, &cargo_lock]);
         dbg!(git.output()).map(|_| ()).into_diagnostic()
     }
 }
