@@ -68,17 +68,19 @@ fn main() -> Result<()> {
         let git = GitBuilder::new().root_directory(root_dir).build();
 
         git.add_cargo_files(new_packages.cargo_file_path())?;
-        todo!();
         git.commit(&args, &new_version)?;
+        args.try_allow_dirty().context("line 72")?;
         git.tag(&args, &new_version, None)?;
         if args.git_push() {
             let gpjh = git.push(&args, &new_version).context("git push")?;
             tasks.append(gpjh);
         }
+        args.try_allow_dirty().context("line 78")?;
         if args.dry_run() {
             git.tag(&args, &new_version, Some(vec!["--delete"]))?;
         }
     }
+    args.try_allow_dirty().context("line 83")?;
     if args.cargo_publish() {
         tasks.insert(
             cargo_uv::Task::Publish,
