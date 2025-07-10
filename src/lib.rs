@@ -6,6 +6,7 @@ pub(crate) mod error;
 pub(crate) mod git;
 pub(crate) mod manifest;
 pub(crate) mod packages;
+pub(crate) mod task;
 
 pub use cargo::Cargo;
 pub use cli::{Action, Cli};
@@ -14,6 +15,7 @@ pub use manifest::toml_file::{CargoFile, NeedToReadToml, ReadToml};
 pub use manifest::{bump_version, generate_packages, set_version};
 pub use miette::Result;
 pub use packages::{Package, PackageError, PackageName, Packages};
+pub use task::{Task, TaskError, Tasks};
 
 use miette::{IntoDiagnostic, bail};
 use tracing::Level;

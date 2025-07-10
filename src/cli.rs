@@ -28,6 +28,10 @@ pub struct Cli {
     #[arg(default_value_t = Action::default())]
     pub action: Action,
 
+    /// Suppresses stdout out from commands run.
+    #[arg(short = 'Q', long)]
+    pub supress_stdout: bool,
+
     /// Runs the `cargo publish`
     #[arg(short, long)]
     pub cargo_publish: bool,

@@ -1,19 +1,26 @@
 use std::process::{Child, Command, Stdio};
 
 use miette::IntoDiagnostic;
+use tracing::{debug, instrument};
 
 use crate::{GitBuilder, cli::Cli};
 
 pub struct Cargo;
 impl Cargo {
-    pub fn command() -> Command {
+    #[instrument(name = "Cargo::command")]
+    pub fn command(supress_stdout: bool) -> Command {
         let mut cargo = Command::new("cargo");
-        cargo.stdin(Stdio::piped());
+        if !supress_stdout {
+            debug!("Inherit");
+            cargo.stdout(Stdio::inherit());
+        } else {
+            cargo.stdout(Stdio::piped());
+        }
         cargo
     }
 
     pub fn publish(cli_args: &Cli) -> miette::Result<Child> {
-        let mut cargo = Cargo::command();
+        let mut cargo = Cargo::command(cli_args.supress_stdout);
         cargo.arg("publish");
         if cli_args.dry_run() {
             cargo.arg("--dry-run");
@@ -33,8 +40,8 @@ impl Cargo {
             cargo.arg("--no-verify");
         }
 
-        cargo.args(["--color", "never", "--quiet", "--allow-dirty"]);
-
+        cargo.args(["--allow-dirty"]);
+        tracing::trace!("About to run: {:?}", &cargo);
         cargo.spawn().into_diagnostic()
     }
 }

@@ -1,7 +1,7 @@
 use std::env::args;
 
 use cargo_uv::{
-    Action, Cargo, CargoFile, Cli, FOOTER, GitBuilder, Packages, Result, bump_version,
+    Action, Cargo, CargoFile, Cli, FOOTER, GitBuilder, Packages, Result, Tasks, bump_version,
     generate_packages, set_version, setup_tracing,
 };
 use clap::CommandFactory;
@@ -9,16 +9,13 @@ use miette::{Context, IntoDiagnostic};
 use rusty_viking::MietteDefaultConfig;
 
 use clap::FromArgMatches as _;
-use tracing::{debug, error, info};
+use tracing::info;
 fn main() -> Result<()> {
     // removes uv from from input
     let input = args().filter(|a| a != "uv").collect::<Vec<_>>();
     MietteDefaultConfig::init_set_panic_hook(Some(FOOTER.into()))?;
     let mut cli = Cli::command();
-    cli = cli.mut_arg("set_version", |a| {
-        a.conflicts_with("action")
-            .required_if_eq("action", Action::Set)
-    });
+    cli = cli.mut_arg("set_version", |a| a.required_if_eq("action", Action::Set));
     cli.set_bin_name("cargo uv");
     cli = cli.next_line_help(false);
 
@@ -63,47 +60,31 @@ fn main() -> Result<()> {
         cargo_file.write_cargo_file()?;
     }
 
-    let mut join_handles = vec![];
+    let mut tasks = Tasks::new();
     if args.git_tag() {
         info!("Generating git tag");
         let root_dir = args.root_dir()?;
         let git = GitBuilder::new().root_directory(root_dir).build();
 
-        // TODO: Test to see if in different repo as manifest-path.
         git.add_cargo_files(new_packages.cargo_file_path())?;
         git.commit(&args, &new_version)?;
         git.tag(&args, &new_version, None)?;
         if args.git_push() {
-            let mut gpjh = git.push(&args, &new_version).context("git push")?;
-            join_handles.append(&mut gpjh);
+            let gpjh = git.push(&args, &new_version).context("git push")?;
+            tasks.append(gpjh);
         }
         if args.dry_run() {
             git.tag(&args, &new_version, Some(vec!["--delete"]))?;
         }
     }
     if args.cargo_publish() {
-        join_handles.push(Cargo::publish(&args).context("Cargo Publish")?);
+        tasks.insert(
+            cargo_uv::Task::Publish,
+            Some(Cargo::publish(&args).context("Cargo Publish")?),
+        );
     }
 
-    while !join_handles.is_empty() {
-        let mut drop_jh = vec![];
-        for (i, join_handle) in &mut join_handles.iter_mut().enumerate() {
-            match join_handle.try_wait() {
-                Ok(Some(es)) => {
-                    drop_jh.push(i);
-                    debug!("Command {} finish with {}", join_handle.id(), es);
-                }
-                Ok(None) => {}
-                Err(e) => {
-                    error!("Error occured while running a command: {}", e)
-                }
-            }
-        }
-
-        for i in drop_jh {
-            join_handles.remove(i).wait().into_diagnostic()?;
-        }
-    }
+    tasks.join_all()?;
 
     println!("{}", new_version);
     Ok(())
