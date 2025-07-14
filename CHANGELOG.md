@@ -6,6 +6,8 @@
 
 ### Build Changes
 - **CICD:** Updated version of upload artifact
+### Documentation Improvements
+- Added changelog.md
 
 <a name="0.6.8+testing.1"></a>
 ## [0.6.8+testing.1] - 2025-07-14
