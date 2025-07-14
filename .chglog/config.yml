@@ -10,6 +10,7 @@ options:
       Type:
         - feat
         - fix
+        - bug
         - perf
         - refactor
         - test
@@ -21,6 +22,7 @@ options:
     title_maps:
       feat: Features
       fix: Bug Fixes
+      bug: Known Bugs
       perf: Performance Improvements
       refactor: Code Refactoring
       test: Testing Changes
