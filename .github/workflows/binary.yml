@@ -27,7 +27,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Check
-        run: cargo check --release --verbose --target ${{ matrix.target }}
+        run: cargo build --release --verbose --target ${{ matrix.target }}
       - name: Run tests
         run: cargo test --release --verbose --target ${{ matrix.target }}
       - name: Upload Binary
