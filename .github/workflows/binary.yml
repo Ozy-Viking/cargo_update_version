@@ -46,7 +46,7 @@ jobs:
           # (optional) Path to changelog.
           changelog: CHANGELOG.md
           allow-missing-changelog: true
-          branch: main
+          # branch: main
           # (required) GitHub token for creating GitHub Releases.
           token: ${{ secrets.GITHUB_TOKEN }}
 
