@@ -26,7 +26,13 @@
 <a name="0.6.8+testing.5"></a>
 ## [0.6.8+testing.5] - 2025-07-14
 
+
+<a name="0.6.8+testing.7"></a>
+## [0.6.8+testing.7] - 2025-07-14
+
 ### Bug Fixes
+- branch in GA
+- using the --target flag
 - added label so gha can run
 
 <a name="0.6.8+testing.4"></a>
@@ -87,12 +93,12 @@
 ## [0.5.3] - 2025-07-05
 
 
-<a name="0.5.2"></a>
-## [0.5.2] - 2025-07-04
-
-
 <a name="0.5.2+testing"></a>
 ## [0.5.2+testing] - 2025-07-04
+
+
+<a name="0.5.2"></a>
+## [0.5.2] - 2025-07-04
 
 
 <a name="0.5.1"></a>
@@ -175,7 +181,8 @@
 [Upcoming Changes]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.6.8...HEAD
 [0.6.8]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.6.8+testing.6...0.6.8
 [0.6.8+testing.6]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.6.8+testing.5...0.6.8+testing.6
-[0.6.8+testing.5]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.6.8+testing.4...0.6.8+testing.5
+[0.6.8+testing.5]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.6.8+testing.7...0.6.8+testing.5
+[0.6.8+testing.7]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.6.8+testing.4...0.6.8+testing.7
 [0.6.8+testing.4]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.6.8+testing.3...0.6.8+testing.4
 [0.6.8+testing.3]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.6.8+testing.2...0.6.8+testing.3
 [0.6.8+testing.2]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.6.8+testing.1...0.6.8+testing.2
@@ -187,9 +194,9 @@
 [0.6.2]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.6.1...0.6.2
 [0.6.1]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.6.0...0.6.1
 [0.6.0]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.5.3...0.6.0
-[0.5.3]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.5.2...0.5.3
-[0.5.2]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.5.2+testing...0.5.2
-[0.5.2+testing]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.5.1...0.5.2+testing
+[0.5.3]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.5.2+testing...0.5.3
+[0.5.2+testing]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.5.2...0.5.2+testing
+[0.5.2]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.5.1...0.5.2
 [0.5.1]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.5.0...0.5.1
 [0.5.0]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.4.0...0.5.0
 [0.4.0]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.3.2...0.4.0
