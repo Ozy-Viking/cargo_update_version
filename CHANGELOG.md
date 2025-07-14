@@ -1,6 +1,10 @@
 # Changelog
 
 
+<a name="0.6.8+testing.3"></a>
+## [0.6.8+testing.3] - 2025-07-14
+
+
 <a name="0.6.8+testing.2"></a>
 ## [0.6.8+testing.2] - 2025-07-14
 
@@ -138,7 +142,8 @@
 
 
 
-[Upcoming Changes]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.6.8+testing.2...HEAD
+[Upcoming Changes]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.6.8+testing.3...HEAD
+[0.6.8+testing.3]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.6.8+testing.2...0.6.8+testing.3
 [0.6.8+testing.2]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.6.8+testing.1...0.6.8+testing.2
 [0.6.8+testing.1]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.6.8...0.6.8+testing.1
 [0.6.8]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.6.7...0.6.8
