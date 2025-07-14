@@ -3,6 +3,8 @@
 <a name="Upcoming Changes"></a>
 ## [Upcoming Changes]
 ### Bug Fixes
+- branch in GA
+- using the --target flag
 - added label so gha can run
 ### Build Changes
 - **CICD:** Updated version of upload artifact
