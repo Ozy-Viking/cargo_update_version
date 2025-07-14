@@ -259,7 +259,7 @@ mod tests {
 
         assert_eq!(version.pre, Prerelease::new("alpha.2").unwrap());
         try_bump_major(&mut version, true)?;
-        assert_eq!(version, version!(2 0 0), "Bump 0.1.1 -> 2.0.0");
+        assert_eq!(version, version!(1 0 0), "Bump 0.1.1-alpha.2 -> 1.0.0");
         assert!(version > version!("0.1.1-alpha.2"));
         Ok(())
     }
