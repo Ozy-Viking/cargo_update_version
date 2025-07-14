@@ -1,5 +1,9 @@
 # Changelog
 
+<a name="Upcoming Changes"></a>
+## [Upcoming Changes]
+### Documentation Improvements
+- Added changelog.md
 
 <a name="0.6.8+testing.2"></a>
 ## [0.6.8+testing.2] - 2025-07-14
