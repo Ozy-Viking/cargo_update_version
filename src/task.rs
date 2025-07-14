@@ -114,6 +114,7 @@ impl AsMut<HashSet<Task>> for Tasks {
 }
 
 impl Tasks {
+    #[allow(clippy::result_large_err)]
     #[instrument(skip_all, fields(remaining_tasks), name = "Tasks::join_all")]
     pub fn join_all(mut self) -> miette::Result<Vec<Task>, TaskError> {
         tracing::debug!("Starting to join tasks: {}", self.remaining_tasks_left());
