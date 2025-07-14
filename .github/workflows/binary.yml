@@ -35,7 +35,7 @@ jobs:
         with:
           name: ${{matrix.os}}-${{matrix.target}}-release
           path: |
-            target/release
+            target/release/**
   create-release:
     needs: check
     runs-on: ubuntu-latest
@@ -66,7 +66,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: ${{matrix.os}}-${{matrix.target}}-release
-          path: target/
+          path: target/release/
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Display structure of downloaded files
         run: ls target
