@@ -1,7 +1,9 @@
 # Changelog
 
-<a name="Upcoming Changes"></a>
-## [Upcoming Changes]
+
+<a name="0.6.8+testing.5"></a>
+## [0.6.8+testing.5] - 2025-07-14
+
 ### Bug Fixes
 - added label so gha can run
 
@@ -152,7 +154,8 @@
 
 
 
-[Upcoming Changes]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.6.8+testing.4...HEAD
+[Upcoming Changes]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.6.8+testing.5...HEAD
+[0.6.8+testing.5]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.6.8+testing.4...0.6.8+testing.5
 [0.6.8+testing.4]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.6.8+testing.3...0.6.8+testing.4
 [0.6.8+testing.3]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.6.8+testing.2...0.6.8+testing.3
 [0.6.8+testing.2]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.6.8+testing.1...0.6.8+testing.2
