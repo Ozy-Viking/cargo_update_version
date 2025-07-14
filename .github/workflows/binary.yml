@@ -67,7 +67,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: ${{matrix.os}}-${{matrix.target}}-release
-          path: target/${{ matrix.target }}/release/**
+          path: target/${{ matrix.target }}/release/
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Display structure of downloaded files
