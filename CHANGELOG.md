@@ -6,6 +6,7 @@
 - branch in GA
 - using the --target flag
 - added label so gha can run
+- **CI:** path to binary fixed 2
 - **CI:** path to binary fixed
 ### Build Changes
 - **CICD:** Updated version of upload artifact
