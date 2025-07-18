@@ -4,6 +4,9 @@
 ## [Upcoming Changes]
 ### Bug Fixes
 - **CI:** changed to build
+### Features
+- **cli:** change suppress flag to use value enum with default
+- **cli:** add suppress enum to control stdout output
 
 <a name="0.6.8+testing.10"></a>
 ## [0.6.8+testing.10] - 2025-07-14
