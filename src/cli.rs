@@ -65,11 +65,11 @@ pub struct Cli {
 
     /// All commands run as if they run in the the directory of the Cargo.toml set.
     #[command(flatten)]
-    pub manifest: clap_cargo::Manifest,
+    pub manifest: Manifest,
 
-    // TODO: Add workplace functionality
-    // #[command(flatten)]
-    // workspace: clap_cargo::Workspace,
+    #[command(flatten)]
+    pub workspace: Workspace,
+
     #[arg(short, long, help = "Bypass version bump checks.")]
     pub force_version: bool,
 
@@ -85,32 +85,9 @@ pub struct Cli {
     /// New version to set. Ignored if action isn't set.
     #[arg(value_parser = Version::parse)]
     pub set_version: Option<Version>,
-}
 
-#[derive(Debug, clap::Args)]
-pub struct GitOps {
-    #[arg(
-        short = 't',
-        long,
-        help = "Create a git tag.",
-        long_help = "Create a git tag. After changing the version, the Cargo.toml and Cargo.lock will be commited and the tag made on this new commit.",
-        help_heading = GIT_HEADER
-    )]
-    pub git_tag: bool,
-    #[arg(
-        long,
-        help = "Push tag to the branch's remote repositries.",
-        long_help = "Push tag to the branch's remote repositries. Runs 'git push <remote> tags/<tag>' for each remote.",
-        help_heading = GIT_HEADER
-    )]
-    pub git_push: bool,
-    #[arg(short, long, help="Message for git commit. Default to git tag.",
-        help_heading = GIT_HEADER
-    )]
-    pub message: Option<String>,
-    #[arg(long = "force-git", help = "Pass force into all git operations.",
-        help_heading = GIT_HEADER)]
-    pub force: bool,
+    #[arg(skip)]
+    metadata: Option<Metadata>,
 }
 
 impl Cli {
@@ -243,5 +220,37 @@ impl Cli {
 
     pub fn no_verify(&self) -> bool {
         self.no_verify
+    }
+
+    // /// Partition workspace members into those selected and those excluded.
+    // ///
+    // /// Notes:
+    // /// - Requires the features `cargo_metadata`.
+    // /// - Requires not calling `MetadataCommand::no_deps`
+    // pub fn partition_packages<'p>(
+    //     &'p mut self,
+    // ) -> Result<(
+    //     Vec<&'p cargo_metadata::Package>,
+    //     Vec<&'p cargo_metadata::Package>,
+    // )> {
+    //     self.refresh_metadata()?;
+    //     match self.metadata() {
+    //         Some(meta) => Ok(self.workspace.partition_packages(meta)),
+    //         None => bail!("Metadata not fetched."),
+    //     }
+    // }
+}
+
+impl Deref for Cli {
+    type Target = Workspace;
+
+    fn deref(&self) -> &Workspace {
+        &self.workspace
+    }
+}
+
+impl Cli {
+    pub fn metadata(&self) -> Option<&Metadata> {
+        self.metadata.as_ref()
     }
 }

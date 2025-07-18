@@ -1,76 +1,59 @@
 #![allow(dead_code)]
-use std::{collections::HashMap, fmt::Display, ops::DerefMut, path::PathBuf};
+
+mod package_name;
+pub use package_name::PackageName;
+
+use std::io::Write;
+use std::{
+    collections::{HashMap, HashSet},
+    path::PathBuf,
+};
 
 use cargo_metadata::Metadata;
 use semver::Version;
 use tracing::{debug, instrument};
 
-/// Newtype around Package Name.
-#[derive(Debug, Default, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
-pub struct PackageName(String);
-
-impl Display for PackageName {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-impl<T> From<T> for PackageName
-where
-    T: Into<String>,
-{
-    fn from(value: T) -> Self {
-        Self(value.into())
-    }
-}
-
-impl std::ops::Deref for PackageName {
-    type Target = String;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for PackageName {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-impl AsRef<str> for PackageName {
-    fn as_ref(&self) -> &str {
-        &self.0
-    }
-}
-
-impl AsMut<str> for PackageName {
-    fn as_mut(&mut self) -> &mut str {
-        &mut self.0
-    }
-}
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct Packages {
     /// File path to the root cargo.toml
-    cargo_file_path: PathBuf,
+    root_manifest_path: PathBuf,
     /// Root package of the rust project.
     root_package: Option<PackageName>,
+
+    /// Default members
+    default_members: HashSet<PackageName>,
+
     /// Hashmap of the packages in the rust project.
     packages: HashMap<PackageName, Package>,
 }
 
+impl AsRef<HashMap<PackageName, Package>> for Packages {
+    fn as_ref(&self) -> &HashMap<PackageName, Package> {
+        &self.packages
+    }
+}
+
 impl Packages {
-    pub fn new<P>(path: Option<PathBuf>, packages: &[P], root_package: Option<&P>) -> Self
+    pub fn new<P, N>(
+        path: PathBuf,
+        packages: &[P],
+        root_package: Option<&P>,
+        default_members: Vec<N>,
+    ) -> Self
     where
         P: Into<Package> + Clone,
+        N: ToString + Clone,
     {
         let mut ret = Self {
-            cargo_file_path: path.unwrap_or_default(),
+            root_manifest_path: path,
             root_package: None,
             packages: HashMap::from_iter(packages.iter().map(|package| {
                 let package: Package = package.clone().into();
                 (package.name.clone(), package)
             })),
+            default_members: HashSet::from_iter(
+                default_members.iter().map(|n| PackageName(n.to_string())),
+            ),
         };
         if let Some(root_package) = root_package {
             ret.root_package = ret
@@ -84,10 +67,21 @@ impl Packages {
     #[instrument()]
     pub fn cargo_file_path(&self) -> &PathBuf {
         debug!("Fetching cargo path");
-        &self.cargo_file_path
+        &self.root_manifest_path
     }
     pub fn drop_root_package_name(&mut self) {
         self.root_package = None
+    }
+
+    pub fn workspace_default_members(&self) -> HashSet<&PackageName> {
+        self.packages()
+            .keys()
+            .filter(|&p| self.default_members.contains(p))
+            .collect()
+    }
+
+    pub fn workspace_members(&self) -> HashSet<&PackageName> {
+        self.packages.keys().collect()
     }
 
     /// Trys to set root package name, returns [None] if package doesn't exist or an invalid name is inputed.
@@ -169,8 +163,12 @@ impl Packages {
         &self.packages
     }
 
+    pub fn package_set(&self) -> HashSet<&Package> {
+        self.packages.values().collect::<HashSet<_>>()
+    }
+
     pub fn set_cargo_file_path(&mut self, cargo_file: PathBuf) {
-        self.cargo_file_path = cargo_file;
+        self.root_manifest_path = cargo_file;
     }
 
     pub(crate) fn get_root_package_version(&self) -> Option<Version> {
@@ -178,10 +176,96 @@ impl Packages {
     }
 }
 
+impl Packages {
+    pub fn display_tree(&self) -> String {
+        let mut ret_string = Vec::new();
+        let root_package = self.root_package.as_ref();
+        let path_base = self.cargo_file_path().parent().unwrap();
+        let make_relative = |package: &Package| {
+            PathBuf::new()
+                .join(".")
+                .join(
+                    package
+                        .manifest_path
+                        .parent()
+                        .unwrap()
+                        .strip_prefix(path_base)
+                        .unwrap(),
+                )
+                .as_os_str()
+                .to_string_lossy()
+                .into_owned()
+        };
+        let _ = writeln!(
+            ret_string,
+            "Workspace root: {}",
+            path_base.as_os_str().to_str().unwrap()
+        );
+        if let Some(root) = root_package {
+            let package = self.get_package(root).unwrap();
+            let _ = writeln!(ret_string, "Root package: {root} {}", package.version,);
+        }
+
+        if !self.default_members.is_empty() {
+            let _ = writeln!(
+                ret_string,
+                "Default members: {:?}",
+                self.default_members
+                    .iter()
+                    .map(|n| n.to_string())
+                    .collect::<Vec<_>>()
+            );
+        }
+
+        let _ = writeln!(ret_string);
+
+        if let Some(root) = root_package {
+            let _ = writeln!(ret_string, "{root}");
+        } else {
+            let _ = writeln!(ret_string, "Members:");
+        }
+
+        let mut items = self.packages.iter().collect::<Vec<_>>();
+        items.sort_by_key(|(n, _)| n.0.as_str());
+        let last = items.last().cloned();
+
+        for (name, package) in items {
+            if Some(name) == root_package {
+                continue;
+            }
+            if Some((name, package)) == last {
+                let _ = writeln!(
+                    ret_string,
+                    "└─ {name} {}: {}",
+                    package.version,
+                    make_relative(package)
+                );
+            } else {
+                let _ = writeln!(
+                    ret_string,
+                    "├─ {name} {}: {}",
+                    package.version,
+                    make_relative(package)
+                );
+            }
+        }
+
+        // root package: a
+        // default members: ["a"]
+        //
+        // All members:
+        //     ├─ "a"
+        //     └─ "b"
+
+        String::from_utf8(ret_string).expect("Chars is valid utf-8")
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
 pub struct Package {
     name: PackageName,
     version: Version,
+    manifest_path: PathBuf,
 }
 
 impl Package {
@@ -203,13 +287,27 @@ impl From<cargo_metadata::Package> for Package {
         Self {
             name: meta_package.name.to_string().into(),
             version: meta_package.version,
+            manifest_path: meta_package.manifest_path.into(),
         }
     }
 }
 
 impl From<&Metadata> for Packages {
     fn from(metadata: &Metadata) -> Self {
-        Self::new(None, &metadata.packages, metadata.root_package())
+        let root_path = metadata.workspace_root.join("Cargo.toml");
+
+        let default_members = metadata
+            .workspace_default_packages()
+            .iter()
+            .map(|p| p.name.clone())
+            .collect::<Vec<_>>();
+
+        Self::new(
+            root_path.into(),
+            &metadata.packages,
+            metadata.root_package(),
+            default_members,
+        )
     }
 }
 
