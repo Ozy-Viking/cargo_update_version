@@ -44,9 +44,8 @@ pub struct Cli {
     #[arg(short, long, help_heading = CARGO_HEADER)]
     pub cargo_publish: bool,
 
-    // TODO: turn supress into value enum.
-    /// Suppresses stdout out from cargo commands run.
-    #[arg(short = 'Q', long, help_heading = CARGO_HEADER)]
+    /// What to suppress from stdout
+    #[arg(short = 'Q', long, default_value = Suppress::default())]
     pub suppress: Suppress,
 
     /// adds 'no_verify' to cargo publish command.
