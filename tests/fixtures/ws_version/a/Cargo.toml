@@ -1,0 +1,6 @@
+[package]
+name = "a"
+version.workspace = true
+authors = ["Ed Page <eopage@gmail.com>"]
+
+[dependencies]

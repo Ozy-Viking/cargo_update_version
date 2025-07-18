@@ -5,7 +5,7 @@ use cargo_uv::{
     generate_packages, set_version, setup_tracing,
 };
 use clap::CommandFactory;
-use miette::{Context, IntoDiagnostic};
+use miette::{Context, IntoDiagnostic, ensure};
 use rusty_viking::MietteDefaultConfig;
 
 use clap::FromArgMatches as _;
@@ -19,17 +19,41 @@ fn main() -> Result<()> {
     cli.set_bin_name("cargo uv");
     cli = cli.next_line_help(false);
 
-    let args = Cli::from_arg_matches(&cli.get_matches_from(&input)).into_diagnostic()?;
+    let mut args = Cli::from_arg_matches(&cli.get_matches_from(&input)).into_diagnostic()?;
 
     setup_tracing(&args)?;
     args.try_allow_dirty()?;
-    let meta = args.metadata()?;
 
-    let current_packages: Packages = generate_packages(&args)?;
+    let meta = args.get_metadata()?;
+    let packages = Packages::from(meta);
+
+    match args.action {
+        Action::Print => todo!(),
+        Action::Tree => {
+            println!("{}", packages.display_tree());
+            return Ok(());
+        }
+        _ => (),
+    }
+
+    let (a, b) = args.workspace.partition_packages(&packages)?;
+
+    let included = a.iter().map(|p| p.name()).collect::<Vec<_>>();
+    let excluded = b.iter().map(|p| p.name()).collect::<Vec<_>>();
+
+    ensure!(
+        !included.is_empty(),
+        help = "Check you are not excluding your root package without including others.",
+        "No packages to modify. Excluded are: {:?}",
+        excluded.iter().map(|p| p.to_string()).collect::<Vec<_>>()
+    );
+
+    let current_packages: Packages = generate_packages(&mut args)?;
 
     let new_packages = match args.action() {
         Action::Set => set_version(current_packages, &args)?,
         Action::Print => {
+            let meta = args.get_metadata()?;
             let version = meta
                 .root_package()
                 .ok_or(miette::miette!(
@@ -42,6 +66,7 @@ fn main() -> Result<()> {
             return Ok(());
         }
         Action::Major | Action::Minor | Action::Patch => bump_version(&args, current_packages)?,
+        Action::Tree => unreachable!(),
     };
 
     let new_version = new_packages
