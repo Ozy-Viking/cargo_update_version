@@ -20,7 +20,7 @@ impl Cargo {
     }
 
     pub fn publish(cli_args: &Cli) -> miette::Result<Child> {
-        let mut cargo = Cargo::command(cli_args.supress_stdout);
+        let mut cargo = Cargo::command(cli_args.suppress.includes_cargo());
         cargo.arg("publish");
         if cli_args.dry_run() {
             cargo.arg("--dry-run");

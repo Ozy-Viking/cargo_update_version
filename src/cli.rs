@@ -1,10 +1,14 @@
-use std::{ffi::OsString, path::PathBuf};
+mod action;
+mod suppress;
 
-use crate::{GitBuilder, Result};
+use std::path::PathBuf;
+
+pub use crate::{
+    GitBuilder, Result,
+    cli::{action::Action, suppress::Suppress},
+};
 use cargo_metadata::Metadata;
-use clap::builder::OsStr;
 use miette::IntoDiagnostic;
-use rusty_viking::EnumDisplay;
 use semver::Version;
 use tracing::{Level, debug, instrument};
 
@@ -40,10 +44,9 @@ pub struct Cli {
     #[arg(short, long, help_heading = CARGO_HEADER)]
     pub cargo_publish: bool,
 
-    // TODO: turn supress into value enum.
-    /// Suppresses stdout out from cargo commands run.
-    #[arg(short = 'Q', long, help_heading = CARGO_HEADER)]
-    pub supress_stdout: bool,
+    /// What to suppress from stdout
+    #[arg(short = 'Q', long, default_value = Suppress::default())]
+    pub suppress: Suppress,
 
     /// adds 'no_verify' to cargo publish command.
     #[arg(long, help_heading = CARGO_HEADER)]
@@ -103,34 +106,6 @@ pub struct GitOps {
     #[arg(long = "force-git", help = "Pass force into all git operations.",
         help_heading = GIT_HEADER)]
     pub force: bool,
-
-    /// Suppresses stdout out from git commands run.
-    #[arg(long,
-        help_heading = GIT_HEADER)]
-    pub git_supress: bool,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Copy, clap::ValueEnum, Default, EnumDisplay)]
-#[Lower]
-pub enum Action {
-    #[value(help = "Bump the version 1 patch level.")]
-    #[default]
-    Patch,
-    #[value(help = "Bump the version 1 minor level.")]
-    Minor,
-    #[value(help = "Bump the version 1 major level.")]
-    Major,
-    #[value(help = "Set the version using valid semantic versioning.")]
-    Set,
-    #[value(help = "Print the current version of the package.")]
-    Print,
-}
-
-impl From<Action> for OsStr {
-    fn from(action: Action) -> Self {
-        let string_rep = OsString::from(action.to_string());
-        Self::from(string_rep)
-    }
 }
 
 impl Cli {

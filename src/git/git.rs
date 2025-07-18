@@ -139,7 +139,7 @@ impl Git<PathBuf> {
 
     #[instrument(skip_all)]
     pub fn commit(&self, cli_args: &Cli, new_version: &Version) -> miette::Result<()> {
-        let mut git = self.command(cli_args.git_ops.git_supress);
+        let mut git = self.command(cli_args.suppress.includes_git());
         info!("Creating commit");
         git.args(["commit"]);
 
@@ -167,7 +167,7 @@ impl Git<PathBuf> {
         version: &Version,
         args: Option<Vec<&str>>,
     ) -> miette::Result<()> {
-        let mut git = self.command(cli_args.git_ops.git_supress);
+        let mut git = self.command(cli_args.suppress.includes_git());
         git.arg("tag");
         if let Some(a) = args {
             git.args(a);
@@ -198,7 +198,7 @@ impl Git<PathBuf> {
             .map(|remote| {
                 let task = Task::Push(remote.clone());
                 info!("Pushing to remote: {remote}");
-                let mut git_push = self.command(cli_args.git_ops.git_supress);
+                let mut git_push = self.command(cli_args.suppress.includes_git());
                 git_push.arg("push");
                 if cli_args.dry_run() {
                     git_push.arg("--dry-run");
