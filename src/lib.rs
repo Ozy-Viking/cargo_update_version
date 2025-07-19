@@ -11,7 +11,10 @@ pub(crate) mod task;
 pub use cargo::Cargo;
 pub use cli::{Action, Cli};
 pub use git::{Git, GitBuilder, GitFile, GitFiles, NoRootDirSet, OutputExt};
-pub use manifest::toml_file::{CargoFile, NeedToReadToml, ReadToml};
+pub use manifest::toml_file::{CargoFile, ReadToml, UnreadToml};
+pub use manifest::version_location::{
+    VersionLocation, VersionLocationErrorKind, VersionlocationError,
+};
 pub use manifest::{bump_version, generate_packages, set_version};
 pub use miette::Result;
 pub use packages::{Package, PackageError, PackageName, Packages};

@@ -1,0 +1,15 @@
+[workspace]
+members = ["a", ".", "a/c"]
+default-members = ["a", "."]
+
+[workspace.package]
+version = "0.1.0"
+
+[package]
+name = "b"
+version = "0.2.3"
+authors = ["Ed Page <eopage@gmail.com>"]
+
+
+[dependencies]
+a = { path = "./a" }

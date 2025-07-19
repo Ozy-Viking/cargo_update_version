@@ -1,4 +1,5 @@
 pub(crate) mod toml_file;
+pub(crate) mod version_location;
 
 use miette::Result;
 use semver::{Prerelease, Version};
@@ -10,7 +11,7 @@ use crate::{
 };
 
 #[instrument(fields(cargo_file))]
-pub fn generate_packages(args: &cli::Cli) -> Result<Packages> {
+pub fn generate_packages(args: &mut cli::Cli) -> Result<Packages> {
     let mut cli_path = args.manifest.manifest_path.as_ref();
     let mut command = args.manifest.metadata();
     if let Some(manifest_path) = cli_path.as_mut() {

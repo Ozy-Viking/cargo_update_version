@@ -1,0 +1,6 @@
+[package]
+name = "c"
+version = "0.0.3"
+authors = ["Ed Page <eopage@gmail.com>"]
+
+[dependencies]
