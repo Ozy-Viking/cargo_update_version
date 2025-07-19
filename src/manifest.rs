@@ -1,4 +1,5 @@
 pub(crate) mod toml_file;
+pub(crate) mod version_location;
 
 use miette::Result;
 use semver::{Prerelease, Version};
