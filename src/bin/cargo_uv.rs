@@ -1,8 +1,8 @@
-use std::env::args;
+use std::{env::args, process::exit};
 
 use cargo_uv::{
-    Action, Cargo, CargoFile, Cli, FOOTER, GitBuilder, Packages, Result, Tasks, bump_version,
-    generate_packages, set_version, setup_tracing,
+    Action, Cargo, CargoFile, Cli, FOOTER, GitBuilder, Packages, Result, Tasks, VersionLocation,
+    bump_version, generate_packages, set_version, setup_tracing,
 };
 use clap::CommandFactory;
 use miette::{Context, IntoDiagnostic, ensure};
@@ -69,15 +69,17 @@ fn main() -> Result<()> {
         Action::Tree => unreachable!(),
     };
 
-    let new_version = new_packages
+    todo!("Need to cycle through the packages");
+
+    let new_version = (&new_packages)
         .get_root_package()
         .expect("Only dealing with root packages.")
         .version()
         .clone();
 
-    let mut cargo_file = CargoFile::new(new_packages.cargo_file_path())?;
+    let mut cargo_file = CargoFile::new((&new_packages).cargo_file_path())?;
 
-    cargo_file.set_root_package_version(&new_version)?;
+    cargo_file.set_package_version(&new_version)?;
 
     if !args.dry_run() {
         info!("Writing Cargo File");
