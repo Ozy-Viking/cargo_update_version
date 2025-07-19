@@ -5,6 +5,7 @@
 ### Bug Fixes
 - **CI:** changed to build
 ### Features
+- **cli:** add workspace and git_ops modules and improve metadata handling
 - **cli:** change suppress flag to use value enum with default
 - **cli:** add suppress enum to control stdout output
 
