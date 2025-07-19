@@ -1,21 +1,26 @@
 mod action;
+mod git_ops;
+mod manifest;
 mod suppress;
+mod workspace;
 
-use std::path::PathBuf;
-
-pub use crate::{
-    GitBuilder, Result,
-    cli::{action::Action, suppress::Suppress},
+pub use crate::cli::{
+    action::Action, git_ops::GitOps, manifest::Manifest, suppress::Suppress, workspace::Workspace,
 };
+use std::{ops::Deref, path::PathBuf};
+
+use crate::{GitBuilder, Result};
 use cargo_metadata::Metadata;
 use miette::IntoDiagnostic;
 use semver::Version;
 use tracing::{Level, debug, instrument};
 
 use crate::current_span;
+// use clap::ValueHint;
 
 static GIT_HEADER: &str = "Git";
 static CARGO_HEADER: &str = "Cargo";
+static WORKSPACE_HEADER: &str = "Package Selection";
 
 pub const CLAP_STYLING: clap::builder::styling::Styles = clap::builder::styling::Styles::styled()
     .header(clap_cargo::style::HEADER)
@@ -125,15 +130,33 @@ impl Cli {
         Ok(root)
     }
 
-    #[instrument(skip_all, fields(root_cargo_file), name = "Cli::metadata")]
-    pub fn metadata(&self) -> Result<Metadata> {
+    #[instrument(skip_all, fields(root_cargo_file), name = "Cli::get_metadata")]
+    pub fn get_metadata<'m>(&'m mut self) -> Result<&'m Metadata> {
+        if let Some(ref m) = self.metadata {
+            Ok(m)
+        } else {
+            self.refresh_metadata()?;
+            let cargo_file = self
+                .metadata
+                .as_ref()
+                .unwrap()
+                .workspace_root
+                .join("Cargo.toml")
+                .to_string();
+            current_span!().record("root_cargo_file", cargo_file);
+            tracing::info!("Package metadata found.");
+            self.metadata
+                .as_ref()
+                .ok_or_else(|| miette::miette!("Failed to get metadata somehow..."))
+        }
+    }
+
+    #[instrument(skip_all, fields(root_cargo_file), name = "Cli::refresh_metadata")]
+    pub fn refresh_metadata(&mut self) -> Result<()> {
         let mut cmd = self.manifest.metadata();
-        cmd.no_deps();
-        let res = cmd.exec().into_diagnostic()?;
-        let cargo_file = res.root_package().unwrap().manifest_path.to_string();
-        current_span!().record("root_cargo_file", cargo_file);
-        tracing::info!("Package metadata found.");
-        Ok(res)
+        cmd.no_deps(); // Confirmed does have an impact on performance.
+        self.metadata = Some(cmd.exec().into_diagnostic()?);
+        Ok(())
     }
 
     #[instrument(skip_all, fields(self.verbosity), name ="Cli::tracing_level")]
