@@ -105,16 +105,16 @@ impl Git<PathBuf> {
     }
 
     #[instrument(skip_all)]
-    pub fn add_cargo_files(&self, cargo_file: &Path) -> miette::Result<()> {
+    /// Adds all cargo files (Cargo.toml, Cargo.lock) in whole project to git.
+    ///
+    /// Equivilent to: `git add */Cargo.toml */Cargo.lock`
+    ///
+    /// TODO: Confirm if file is in git ignore it doesn't add them.
+    pub fn add_cargo_files(&self) -> miette::Result<()> {
         let mut git = self.command(false);
-        let cargo_lock = cargo_file
-            .to_path_buf()
-            .parent()
-            .unwrap()
-            .join("Cargo.lock")
-            .display()
-            .to_string();
-        let cargo_toml = cargo_file.display().to_string();
+        let cargo_toml = "*/Cargo.toml";
+        let cargo_lock = "*/Cargo.lock";
+
         info!("Staging cargo files: {}, {}", cargo_toml, cargo_lock);
         git.args(["add", "-v", &cargo_toml, &cargo_lock]);
         git.output().map(|_| ()).into_diagnostic()

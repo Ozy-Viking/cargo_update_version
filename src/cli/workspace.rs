@@ -5,7 +5,7 @@ use std::collections::HashSet;
 
 use tracing::{instrument, trace};
 
-use crate::{Package, PackageName, Packages, Result, cli::WORKSPACE_HEADER};
+use crate::{Package, PackageName, Packages, ReadToml, Result, cli::WORKSPACE_HEADER};
 
 /// Cargo flags for selecting crates in a workspace.
 #[derive(Default, Clone, Debug, PartialEq, Eq, clap::Args)]
@@ -24,6 +24,10 @@ pub struct Workspace {
     /// Process all packages in the workspace
     pub workspace: bool,
 
+    #[arg(long, visible_alias("ws"), help_heading = WORKSPACE_HEADER)]
+    /// Process workspace.package.version
+    pub workspace_package: bool,
+
     #[arg(long, help_heading = WORKSPACE_HEADER, conflicts_with("workspace"))]
     /// Process only default workspace members
     pub default_members: bool,
@@ -39,7 +43,7 @@ impl Workspace {
     pub fn partition_packages<'m>(
         &self,
         packages: &'m Packages,
-    ) -> Result<(Vec<&'m Package>, Vec<&'m Package>)> {
+    ) -> Result<(Vec<&'m Package<ReadToml>>, Vec<&'m Package<ReadToml>>)> {
         let selection = PackagesCli::from_flags(
             self.workspace,
             self.default_members,
@@ -64,7 +68,9 @@ impl Workspace {
             .package_set()
             .into_iter()
             // Deviating from cargo by not supporting patterns
-            .partition(|package: &&Package| modifications.include(&base_ids, package.name())))
+            .partition(|package: &&Package<ReadToml>| {
+                modifications.include(&base_ids, package.name())
+            }))
     }
 }
 

@@ -1,6 +1,8 @@
-use std::{borrow::Borrow, fmt::Display, ops::DerefMut};
+use std::{borrow::Borrow, fmt::Display, ops::DerefMut, str::FromStr};
 
 /// Newtype around Package Name.
+///
+/// `workspace.package` for the workspace package as '.' is an invalid char for a package name.
 #[derive(Debug, Default, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
 pub struct PackageName(pub String);
 
@@ -46,11 +48,7 @@ impl AsRef<str> for PackageName {
         &self.0
     }
 }
-// impl AsRef<String> for PackageName {
-//     fn as_ref(&self) -> &String {
-//         &self.0
-//     }
-// }
+
 impl AsMut<str> for PackageName {
     fn as_mut(&mut self) -> &mut str {
         &mut self.0

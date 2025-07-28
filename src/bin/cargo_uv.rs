@@ -1,15 +1,14 @@
-use std::{env::args, process::exit};
+use std::env::args;
 
 use cargo_uv::{
-    Action, Cargo, CargoFile, Cli, FOOTER, GitBuilder, Packages, Result, Tasks, VersionLocation,
-    bump_version, generate_packages, set_version, setup_tracing,
+    Action, Cargo, Cli, FOOTER, GitBuilder, Package, Packages, Result, Task, Tasks, VersionType,
+    setup_tracing,
 };
 use clap::CommandFactory;
-use miette::{Context, IntoDiagnostic, ensure};
+use miette::{Context, IntoDiagnostic, bail, ensure};
 use rusty_viking::MietteDefaultConfig;
 
-use clap::FromArgMatches as _;
-use tracing::info;
+use clap::FromArgMatches;
 fn main() -> Result<()> {
     // removes uv from from input
     let input = args().filter(|a| a != "uv").collect::<Vec<_>>();
@@ -27,8 +26,15 @@ fn main() -> Result<()> {
     let meta = args.get_metadata()?;
     let packages = Packages::from(meta);
 
-    match args.action {
-        Action::Print => todo!(),
+    match args.action() {
+        Action::Print => {
+            let root_package = args.get_metadata()?.root_package().ok_or(miette::miette!(
+                help = "Use the tree action if in a workspace without a root package.",
+                "When printing, expected a root package."
+            ))?;
+            println!("{} {}", root_package.name, root_package.version);
+            return Ok(());
+        }
         Action::Tree => {
             println!("{}", packages.display_tree());
             return Ok(());
@@ -36,77 +42,139 @@ fn main() -> Result<()> {
         _ => (),
     }
 
-    let (a, b) = args.workspace.partition_packages(&packages)?;
-
-    let included = a.iter().map(|p| p.name()).collect::<Vec<_>>();
-    let excluded = b.iter().map(|p| p.name()).collect::<Vec<_>>();
+    let (included, excluded) = args.workspace.partition_packages(&packages)?;
 
     ensure!(
         !included.is_empty(),
         help = "Check you are not excluding your root package without including others.",
         "No packages to modify. Excluded are: {:?}",
-        excluded.iter().map(|p| p.to_string()).collect::<Vec<_>>()
+        excluded
+            .iter()
+            .map(|p| p.name().to_string())
+            .collect::<Vec<_>>()
     );
+    drop(excluded);
 
-    let current_packages: Packages = generate_packages(&mut args)?;
+    let mut change_workspace_package_version = false;
+    let workspace_root = args.get_metadata()?.workspace_root.as_std_path();
+    let mut workspace_package: Package<cargo_uv::ReadToml> =
+        Package::workspace_package(&workspace_root)?;
+    let mut tasks = Tasks::new();
 
-    let new_packages = match args.action() {
-        Action::Set => set_version(current_packages, &args)?,
-        Action::Print => {
-            let meta = args.get_metadata()?;
-            let version = meta
-                .root_package()
-                .ok_or(miette::miette!(
-                    "No root package. Currently only projects with a root package is supported."
-                ))?
-                .version
-                .clone();
+    for package in included {
+        if package.version_type() == VersionType::SetByWorkspace {
+            change_workspace_package_version = true;
+            tracing::info!(
+                "Changing Workspace Package Version due to: {}",
+                package.name()
+            );
+        } else {
+            // TODO: Move to refs over cloning.
+            let task = Task::from_action(
+                args.action(),
+                package.clone(),
+                args.pre.clone(),
+                args.build.clone(),
+                args.set_version.clone(),
+                args.force_version,
+            )?;
 
-            println!("{}", version);
-            return Ok(());
+            tasks.insert(task, None);
         }
-        Action::Major | Action::Minor | Action::Patch => bump_version(&args, current_packages)?,
-        Action::Tree => unreachable!(),
-    };
-
-    todo!("Need to cycle through the packages");
-
-    let new_version = (&new_packages)
-        .get_root_package()
-        .expect("Only dealing with root packages.")
-        .version()
-        .clone();
-
-    let mut cargo_file = CargoFile::new((&new_packages).cargo_file_path())?;
-
-    cargo_file.set_package_version(&new_version)?;
-
-    if !args.dry_run() {
-        info!("Writing Cargo File");
-        cargo_file.write_cargo_file()?;
     }
 
-    // let _new_manifest = args.metadata()?;
+    if change_workspace_package_version {
+        let task = match args.action() {
+            Action::Pre | Action::Patch | Action::Minor | Action::Major => {
+                Some(Task::BumpWorkspace {
+                    bump: args.action(),
+                    pre: args.pre.clone(),
+                    build: args.build.clone(),
+                    force: args.force_version,
+                })
+            }
+            Action::Set => Some(Task::SetWorkspace {
+                version: args.set_version.clone().ok_or(miette::miette!(
+                    "Expected a new version for Task::from_action when action is Set"
+                ))?,
+            }),
+            Action::Print | Action::Tree => None,
+        };
+        if let Some(t) = task {
+            tasks.insert(t, None);
+        }
+    }
 
-    let mut tasks = Tasks::new();
+    let mut new_version: Option<semver::Version> = None;
+    for task in tasks.version_change_tasks() {
+        match task {
+            Task::Set {
+                version: new_version,
+                mut package,
+            } => {
+                package.set_version(new_version)?;
+                if !args.dry_run() {
+                    package.write_cargo_file()?;
+                }
+            }
+            Task::Bump {
+                mut package,
+                bump,
+                pre,
+                build,
+                force,
+            } => {
+                package.bump_version(bump, pre, build, force)?;
+                if !args.dry_run() {
+                    package.write_cargo_file()?;
+                }
+            }
+            Task::BumpWorkspace {
+                bump,
+                pre,
+                build,
+                force,
+            } => {
+                new_version = Some(workspace_package.bump_version(bump, pre, build, force)?);
+                if !args.dry_run() {
+                    workspace_package.write_cargo_file()?;
+                }
+            }
+            Task::SetWorkspace { version } => {
+                new_version = Some(workspace_package.set_version(version)?);
+                if !args.dry_run() {
+                    workspace_package.write_cargo_file()?;
+                }
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    Cargo::generate_lockfile(&args)?;
+
     if args.git_tag() {
-        info!("Generating git tag");
+        tracing::info!("Generating git tag");
         let root_dir = args.root_dir()?;
         let git = GitBuilder::new().root_directory(root_dir).build();
 
-        git.add_cargo_files(new_packages.cargo_file_path())?;
-        git.commit(&args, &new_version)?;
-        git.tag(&args, &new_version, None)?;
-        if args.git_push() {
-            let gpjh = git.push(&args, &new_version).context("git push")?;
-            tasks.append(gpjh);
-        }
-
-        // BUG: #2 Deletes tag before push so push fails.
-        if args.dry_run() {
-            git.tag(&args, &new_version, Some(vec!["--delete"]))?;
+        git.add_cargo_files()?;
+        if let Some(version) = new_version {
+            git.commit(&args, &version)?; // BUG: #26 Not handling the case when the message is set.
+            git.tag(&args, &version, None)?;
+            if args.git_push() {
+                let gpjh = git.push(&args, &version).context("git push")?;
+                tasks.append(gpjh);
+            }
+            // BUG: #2 Deletes tag before push so push fails.
+            if args.dry_run() {
+                let task = Task::DeleteGitTag(version);
+                tasks.insert(task, None);
+            }
+        } else {
+            bail!("Unable to commit or tag due to uncertainty of which tag to use.")
         }
     }
+
     if args.cargo_publish() {
         tasks.insert(
             cargo_uv::Task::Publish,
@@ -114,15 +182,19 @@ fn main() -> Result<()> {
         );
     }
 
-    match tasks.join_all() {
-        Ok(_ts) => {
-            println!("{}", new_version);
-            Ok(())
-        }
+    let tasks = match tasks.join_all() {
+        Ok(ts) => ts,
         Err(e) => {
             tracing::warn!("Tasks errored, Completed tasks: {:?}", e.completed_tasks);
             tracing::warn!("Tasks with unknown status: {:?}", e.incomplete_tasks);
-            Err(e.into())
+            return Err(e.into());
         }
-    }
+    };
+
+    if let Some(Task::DeleteGitTag(version)) = tasks.delete_tag() {
+        let root_dir = args.root_dir()?;
+        let git = GitBuilder::new().root_directory(root_dir).build();
+        git.tag(&args, version, Some(vec!["--delete"]))?;
+    };
+    Ok(())
 }

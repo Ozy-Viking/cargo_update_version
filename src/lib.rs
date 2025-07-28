@@ -7,18 +7,21 @@ pub(crate) mod git;
 pub(crate) mod manifest;
 pub(crate) mod packages;
 pub(crate) mod task;
+pub(crate) mod version;
 
 pub use cargo::Cargo;
 pub use cli::{Action, Cli};
 pub use git::{Git, GitBuilder, GitFile, GitFiles, NoRootDirSet, OutputExt};
-pub use manifest::toml_file::{CargoFile, ReadToml, UnreadToml};
-pub use manifest::version_location::{
-    VersionLocation, VersionLocationErrorKind, VersionlocationError,
+pub use manifest::error::{
+    CargoFileError, CargoFileErrorKind, ItemType, VersionLocationErrorKind, VersionlocationError,
 };
-pub use manifest::{bump_version, generate_packages, set_version};
+pub use manifest::generate_packages;
+pub use manifest::toml_file::{CargoFile, ReadToml, UnreadToml};
+pub use manifest::version_location::{VersionLocation, VersionType};
 pub use miette::Result;
 pub use packages::{Package, PackageError, PackageName, Packages};
 pub use task::{Task, TaskError, Tasks};
+pub use version::{Bumpable, Setable};
 
 use miette::{IntoDiagnostic, bail};
 use tracing::Level;

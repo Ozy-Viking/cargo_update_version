@@ -3,10 +3,11 @@ use std::{
     process::{Child, ExitStatus, Output},
 };
 
-use semver::Version;
-use tracing::{info, instrument};
+use miette::bail;
+use semver::{BuildMetadata, Prerelease, Version};
+use tracing::{info, instrument, subscriber::SetGlobalDefaultError};
 
-use crate::{OutputExt, current_span};
+use crate::{Action, OutputExt, Package, ReadToml, Result, current_span};
 
 #[derive(Debug, Default)]
 pub struct Tasks {
@@ -32,7 +33,7 @@ impl Tasks {
         self.keys().cloned().collect()
     }
 
-    /// [Vec] of incomplete tasks.
+    /// [Vec<Task>] of incomplete tasks.
     pub fn incomplete_tasks(&self) -> Vec<Task> {
         self.tasks
             .keys()
@@ -56,6 +57,18 @@ impl Tasks {
     pub fn remaining_tasks_left(&self) -> usize {
         self.incomplete_tasks().len()
     }
+
+    pub fn version_change_tasks(&self) -> Vec<Task> {
+        self.tasks
+            .keys()
+            .filter(|&k| !self.completed.contains(k) && k.is_version_change())
+            .cloned()
+            .collect()
+    }
+
+    pub fn delete_tag(&self) -> Option<&Task> {
+        self.tasks.keys().find(|k| k.is_delete_git_tag())
+    }
 }
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
@@ -63,16 +76,86 @@ pub enum Task {
     Push(String),
     Publish,
     Print,
-    Set,
-    Bump(BumpType),
+    Tree,
+    Set {
+        version: Version,
+        package: Package<ReadToml>,
+    },
+    Bump {
+        package: Package<ReadToml>,
+        bump: Action,
+        pre: Option<Prerelease>,
+        build: Option<BuildMetadata>,
+        force: bool,
+    },
+    BumpWorkspace {
+        bump: Action,
+        pre: Option<Prerelease>,
+        build: Option<BuildMetadata>,
+        force: bool,
+    },
+    SetWorkspace {
+        version: Version,
+    },
     DeleteGitTag(Version),
 }
 
-#[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
-pub enum BumpType {
-    Patch,
-    Minor,
-    Major,
+impl Task {
+    pub fn is_version_change(&self) -> bool {
+        match self {
+            Task::Push(_) | Task::Publish | Task::Print | Task::DeleteGitTag(_) | Task::Tree => {
+                false
+            }
+            Task::Set { .. }
+            | Task::Bump { .. }
+            | Task::BumpWorkspace { .. }
+            | Task::SetWorkspace { .. } => true,
+        }
+    }
+
+    /// Returns `true` if the task is [`DeleteGitTag`].
+    ///
+    /// [`DeleteGitTag`]: Task::DeleteGitTag
+    #[must_use]
+    pub fn is_delete_git_tag(&self) -> bool {
+        matches!(self, Self::DeleteGitTag(..))
+    }
+}
+
+/// TODO: Make a reference.
+impl Task {
+    pub fn from_action(
+        action: Action,
+        package: Package<ReadToml>,
+        pre: Option<Prerelease>,
+        build: Option<BuildMetadata>,
+        new_version: Option<Version>,
+        force: bool,
+    ) -> Result<Task> {
+        match action {
+            Action::Pre | Action::Patch | Action::Minor | Action::Major => Ok(Task::Bump {
+                package: package,
+                bump: action,
+                pre,
+                build,
+                force,
+            }),
+            Action::Set => Ok(Task::Set {
+                version: new_version.ok_or(miette::miette!(
+                    "Expected a new version for Task::from_action when action is Set"
+                ))?,
+                package,
+            }),
+            Action::Print => Ok(Task::Tree),
+            Action::Tree => Ok(Task::Print),
+        }
+    }
+}
+
+impl Task {
+    pub fn run(&mut self) -> Option<Child> {
+        None
+    }
 }
 
 impl std::ops::Deref for Tasks {
@@ -116,7 +199,7 @@ impl AsMut<HashSet<Task>> for Tasks {
 impl Tasks {
     #[allow(clippy::result_large_err)]
     #[instrument(skip_all, fields(remaining_tasks), name = "Tasks::join_all")]
-    pub fn join_all(mut self) -> miette::Result<Vec<Task>, TaskError> {
+    pub fn join_all(mut self) -> miette::Result<Tasks, TaskError> {
         tracing::debug!("Starting to join tasks: {}", self.remaining_tasks_left());
         let span = current_span!();
         while self.remaining_tasks() {
@@ -175,7 +258,7 @@ impl Tasks {
         span.record("remaining_tasks", self.remaining_tasks_left());
         assert_eq!(self.len(), self.complete_tasks().len());
         info!("All {} task/s complete!", self.complete_tasks().len());
-        Ok(self.complete_tasks())
+        Ok(self)
     }
 }
 

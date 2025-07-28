@@ -43,4 +43,22 @@ impl Cargo {
         tracing::trace!("About to run: {:?}", &cargo);
         cargo.spawn().into_diagnostic()
     }
+
+    pub fn generate_lockfile(cli_args: &Cli) -> miette::Result<()> {
+        let mut cargo = Cargo::command(true);
+        cargo.arg("generate-lockfile");
+        if cli_args.manifest.manifest_path.is_some() {
+            cargo
+                .arg("--manifest-path")
+                .arg(cli_args.manifest.manifest_path.clone().unwrap());
+        }
+        let output = cargo.output().into_diagnostic()?;
+        if !output.status.success() {
+            Err(
+                miette::miette!("{}", String::from_utf8(output.stderr).into_diagnostic()?)
+                    .context("While running `cargo generate-lockfile`"),
+            )?;
+        }
+        Ok(())
+    }
 }

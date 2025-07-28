@@ -1,10 +1,19 @@
-use std::{fmt::Display, panic::Location, path::PathBuf};
+use std::fmt::Display;
 
-use rusty_viking::EnumDisplay;
 use semver::Version;
 use tracing::{info, instrument, trace};
 
-use crate::{CargoFile, ReadToml, current_span};
+use crate::{
+    CargoFile, ReadToml, current_span,
+    manifest::error::{ItemType, VersionlocationError},
+};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum VersionType {
+    Package,
+    SetByWorkspace,
+    WorkspacePackage,
+}
 
 #[derive(Debug, Clone, Copy)]
 pub enum VersionLocation {
@@ -28,16 +37,14 @@ impl Display for VersionLocation {
 impl VersionLocation {
     #[track_caller]
     #[instrument(skip_all, fields(version, path))]
-    pub fn get_version<'a>(
+    pub fn get_version(
         &self,
-        cargo_toml: &CargoFile<'a, ReadToml>,
+        cargo_toml: &CargoFile<ReadToml>,
     ) -> Result<Version, VersionlocationError> {
-        use VersionLocationErrorKind as ErrKind;
+        use crate::manifest::error::VersionLocationErrorKind as ErrKind;
         let path = cargo_toml.path();
 
-        let set_err = |kind: VersionLocationErrorKind, context: Option<&'static str>| {
-            kind.to_error(path, context)
-        };
+        let set_err = |kind: ErrKind, context: Option<&'static str>| kind.to_error(path, context);
         let _span = current_span!();
         let document = cargo_toml
             .contents()
@@ -81,9 +88,16 @@ impl VersionLocation {
                 }
             }
             VersionLocation::WorkspacePackage => {
-                let workspace = document
-                    .get("workspace")
-                    .ok_or(set_err(ErrKind::WorkspaceNotFound, None))?;
+                let workspace =
+                    document
+                        .get("workspace")
+                        .ok_or(ErrKind::WorkspaceNotFound.to_error(
+                            path,
+                            Some(format!(
+                                "Workspace Package: {}",
+                                path.as_os_str().to_str().unwrap()
+                            )),
+                        ))?;
 
                 let workspace = workspace.as_table().ok_or_else(|| {
                     set_err(
@@ -123,15 +137,13 @@ impl VersionLocation {
     #[instrument(skip_all, fields(version, path))]
     pub fn set_version<'a>(
         &self,
-        cargo_toml: &mut CargoFile<'a, ReadToml>,
+        cargo_toml: &mut CargoFile<ReadToml>,
         version: &Version,
     ) -> Result<(), VersionlocationError> {
-        use VersionLocationErrorKind as ErrKind;
+        use crate::manifest::error::VersionLocationErrorKind as ErrKind;
         let path = cargo_toml.path().to_path_buf();
 
-        let set_err = |kind: VersionLocationErrorKind, context: Option<&'static str>| {
-            kind.to_error(&path, context)
-        };
+        let set_err = |kind: ErrKind, context: Option<&'static str>| kind.to_error(&path, context);
 
         let _span = current_span!();
 
@@ -205,118 +217,5 @@ impl VersionLocation {
         current_span!().record("path", (&path).as_os_str().to_str().unwrap_or_default());
         info!("Version set: {version}");
         Ok(())
-    }
-}
-
-#[derive(Debug, thiserror::Error, miette::Diagnostic)]
-pub enum VersionLocationErrorKind {
-    #[error("Version is set by workspace.")]
-    SetByWorkspace,
-    #[error("Version not located in {0}")]
-    NotFound(VersionLocation),
-    #[error("No package defined in toml file.")]
-    PackageNotFound,
-    #[error("No workspace defined in toml file.")]
-    WorkspaceNotFound,
-    #[error("Invalid item type of {0}")]
-    ItemInvalid(ItemType),
-    #[error("Invalid semver: {0}")]
-    SemverError(semver::Error),
-}
-
-impl From<semver::Error> for VersionLocationErrorKind {
-    fn from(value: semver::Error) -> Self {
-        Self::SemverError(value)
-    }
-}
-
-impl VersionLocationErrorKind {
-    #[track_caller]
-    pub fn to_error(
-        self,
-        path: impl Into<PathBuf>,
-        context: Option<impl ToString + std::default::Default>,
-    ) -> VersionlocationError {
-        VersionlocationError {
-            kind: self,
-            path: path.into(),
-            location_called: Location::caller(),
-            context: context.unwrap_or_default().to_string(),
-        }
-    }
-}
-
-#[derive(Debug, thiserror::Error, miette::Diagnostic)]
-#[error("context")]
-pub struct VersionlocationError {
-    #[source]
-    kind: VersionLocationErrorKind,
-    path: PathBuf,
-    #[help("Call location: {location_called}")]
-    location_called: &'static Location<'static>,
-    context: String,
-}
-
-impl VersionlocationError {
-    pub fn new(
-        kind: VersionLocationErrorKind,
-        path: PathBuf,
-        location_called: &'static Location<'static>,
-        context: String,
-    ) -> Self {
-        Self {
-            kind,
-            path,
-            location_called,
-            context,
-        }
-    }
-
-    pub fn path(&self) -> &PathBuf {
-        &self.path
-    }
-
-    pub fn kind(&self) -> &VersionLocationErrorKind {
-        &self.kind
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Copy, EnumDisplay)]
-#[Title]
-pub enum ItemType {
-    None,
-    Value,
-    Table,
-    ArrayOfTables,
-}
-
-impl From<toml_edit::Item> for ItemType {
-    fn from(item: toml_edit::Item) -> Self {
-        match item {
-            toml_edit::Item::None => ItemType::None,
-            toml_edit::Item::Value(_) => ItemType::Value,
-            toml_edit::Item::Table(_) => ItemType::Table,
-            toml_edit::Item::ArrayOfTables(_) => ItemType::ArrayOfTables,
-        }
-    }
-}
-impl From<&toml_edit::Item> for ItemType {
-    fn from(item: &toml_edit::Item) -> Self {
-        match item {
-            toml_edit::Item::None => ItemType::None,
-            toml_edit::Item::Value(_) => ItemType::Value,
-            toml_edit::Item::Table(_) => ItemType::Table,
-            toml_edit::Item::ArrayOfTables(_) => ItemType::ArrayOfTables,
-        }
-    }
-}
-impl From<&mut toml_edit::Item> for ItemType {
-    fn from(item: &mut toml_edit::Item) -> Self {
-        match item {
-            toml_edit::Item::None => ItemType::None,
-            toml_edit::Item::Value(_) => ItemType::Value,
-            toml_edit::Item::Table(_) => ItemType::Table,
-            toml_edit::Item::ArrayOfTables(_) => ItemType::ArrayOfTables,
-        }
     }
 }
