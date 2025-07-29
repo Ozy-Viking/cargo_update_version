@@ -2,6 +2,8 @@
 
 <a name="Upcoming Changes"></a>
 ## [Upcoming Changes]
+### Bug Fixes
+- Actual build for all OSs
 ### Chores
 - Update readme
 
