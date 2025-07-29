@@ -1,5 +1,9 @@
 # Changelog
 
+<a name="Upcoming Changes"></a>
+## [Upcoming Changes]
+### Chores
+- Update readme
 
 <a name="0.7.0"></a>
 ## [0.7.0] - 2025-07-29
