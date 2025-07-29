@@ -1,7 +1,9 @@
 # Changelog
 
-<a name="Upcoming Changes"></a>
-## [Upcoming Changes]
+
+<a name="0.7.0"></a>
+## [0.7.0] - 2025-07-29
+
 ### Bug Fixes
 - branch in GA
 - using the --target flag
@@ -24,6 +26,12 @@
 - **cli:** change suppress flag to use value enum with default
 - **cli:** add suppress enum to control stdout output
 - **manifest:** enhance CargoFile version handling to handle workspace
+### Merged Pull Requests
+- 📝 Update Changelog ([#31](https://github.com/Ozy-Viking/cargo_update_version/issues/31))
+- Improve cicd workflow ([#30](https://github.com/Ozy-Viking/cargo_update_version/issues/30))
+- 📝 Update Changelog ([#29](https://github.com/Ozy-Viking/cargo_update_version/issues/29))
+- Add workspace support and package filtering ([#22](https://github.com/Ozy-Viking/cargo_update_version/issues/22))
+
 
 <a name="0.6.8"></a>
 ## [0.6.8] - 2025-07-10
@@ -146,7 +154,8 @@
 
 
 
-[Upcoming Changes]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.6.8...HEAD
+[Upcoming Changes]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.7.0...HEAD
+[0.7.0]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.6.8...0.7.0
 [0.6.8]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.6.7...0.6.8
 [0.6.7]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.6.6...0.6.7
 [0.6.6]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.6.4...0.6.6
