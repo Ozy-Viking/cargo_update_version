@@ -1,11 +1,17 @@
 # Changelog
 
-<a name="Upcoming Changes"></a>
-## [Upcoming Changes]
+
+<a name="0.7.1"></a>
+## [0.7.1] - 2025-07-29
+
 ### Bug Fixes
 - Actual build for all OSs
 ### Chores
 - Update readme
+### Merged Pull Requests
+- 📝 Update Changelog ([#33](https://github.com/Ozy-Viking/cargo_update_version/issues/33))
+- 📝 Update Changelog ([#32](https://github.com/Ozy-Viking/cargo_update_version/issues/32))
+
 
 <a name="0.7.0"></a>
 ## [0.7.0] - 2025-07-29
@@ -160,7 +166,8 @@
 
 
 
-[Upcoming Changes]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.7.0...HEAD
+[Upcoming Changes]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.7.1...HEAD
+[0.7.1]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.7.0...0.7.1
 [0.7.0]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.6.8...0.7.0
 [0.6.8]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.6.7...0.6.8
 [0.6.7]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.6.6...0.6.7
