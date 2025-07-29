@@ -3,11 +3,13 @@ use std::ffi::OsString;
 use clap::builder::OsStr;
 use rusty_viking::EnumDisplay;
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, clap::ValueEnum, Default, EnumDisplay)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, clap::ValueEnum, Default, EnumDisplay, Hash)]
 #[Lower]
 pub enum Action {
+    #[value(help = "Bump the version 1 prerelease level.", hide(true))]
+    // TODO: Remove when implemented.
+    Pre,
     #[value(help = "Bump the version 1 patch level.")]
-    #[default]
     Patch,
     #[value(help = "Bump the version 1 minor level.")]
     Minor,
@@ -16,6 +18,7 @@ pub enum Action {
     #[value(help = "Set the version using valid semantic versioning.")]
     Set,
     #[value(help = "Print the current version of the package.")]
+    #[default]
     Print,
     /// Display the layout of the members in the workspace.
     Tree,

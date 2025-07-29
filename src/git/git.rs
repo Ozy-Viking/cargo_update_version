@@ -95,28 +95,40 @@ impl Git<PathBuf> {
     #[instrument(name = "Git::command", skip_all)]
     fn command(&self, quiet: bool) -> Command {
         let mut cmd = Command::new("git");
+        // cmd.current_dir(&self.root_directory);
         cmd.arg("-C")
             .arg(self.root_directory.clone().into_os_string());
-        tracing::info!("Command: {:#?}", &cmd);
+        tracing::trace!("Command: {:#?}", &cmd);
         if !quiet {
             cmd.stdout(Stdio::inherit());
         }
         cmd
     }
 
+    pub fn root_directory(&self) -> &Path {
+        &self.root_directory
+    }
+
     #[instrument(skip_all)]
-    pub fn add_cargo_files(&self, cargo_file: &Path) -> miette::Result<()> {
+    /// Adds all cargo files (Cargo.toml, Cargo.lock) in whole project to git.
+    ///
+    /// Equivilent to: `git add Cargo.toml Cargo.lock`
+    ///
+    /// TODO: Confirm if file is in git ignore it doesn't add them.
+    /// BUG: #28 Git add fetal if doesn't match path spec. Change to generate adds of known files.
+    /// add 'Cargo.lock'
+    /// add 'Cargo.toml'
+    /// add 'pack1/Cargo.toml'
+    /// add 'pack2/Cargo.toml'
+    pub fn add_cargo_files(&self) -> miette::Result<()> {
         let mut git = self.command(false);
-        let cargo_lock = cargo_file
-            .to_path_buf()
-            .parent()
-            .unwrap()
-            .join("Cargo.lock")
-            .display()
-            .to_string();
-        let cargo_toml = cargo_file.display().to_string();
+        let cargo_toml = "Cargo.toml";
+        let all_cargo_toml = "./**/Cargo.toml";
+        let cargo_lock = "Cargo.lock";
+
         info!("Staging cargo files: {}, {}", cargo_toml, cargo_lock);
-        git.args(["add", "-v", &cargo_toml, &cargo_lock]);
+        git.args(["add", "-v", cargo_toml, cargo_lock, all_cargo_toml]);
+        tracing::debug!("Running: {:?}", git);
         git.output().map(|_| ()).into_diagnostic()
     }
 }
@@ -127,6 +139,7 @@ impl Git<PathBuf> {
     pub fn dirty_files(&self) -> miette::Result<GitFiles> {
         let mut git_status = self.command(true);
         git_status.args(["status", "--short"]);
+        tracing::debug!("Running: {:?}", git_status);
         let stdout = git_status.output().into_diagnostic()?.stdout();
         if stdout.lines().count() == 0 {
             return Ok(GitFiles::new());
@@ -155,6 +168,7 @@ impl Git<PathBuf> {
             }
         }
 
+        tracing::debug!("Running: {:?}", git);
         let _stdout = git.output().into_diagnostic()?;
         self.dirty_files().context("After Commit")?;
         Ok(())
@@ -173,9 +187,11 @@ impl Git<PathBuf> {
             git.args(a);
         }
         git.args([&self.generate_tag(version)]);
+        tracing::debug!("Running: {:?}", git);
         let output = git.output().into_diagnostic()?;
         if !output.status.success() {
             tracing::debug!("stderr: {}", output.stderr());
+            bail!("Failed to tag repository.")
         }
         Ok(())
     }
@@ -205,6 +221,7 @@ impl Git<PathBuf> {
                 }
                 git_push.args([remote.as_str(), &tag_string, "--porcelain"]);
                 // let _ = dbg!(git_push.get_args());
+                tracing::debug!("Running: {:?}", git_push);
                 (task, git_push.spawn().into_diagnostic())
             })
             .collect::<Vec<_>>();
@@ -224,6 +241,7 @@ impl Git<PathBuf> {
     pub fn remotes(&self) -> miette::Result<Vec<String>> {
         let mut git = self.command(true);
         git.args(["remote"]);
+        tracing::debug!("Running: {:?}", git);
         let remotes: Vec<String> = git
             .output()
             .into_diagnostic()?
@@ -264,6 +282,7 @@ impl Git<PathBuf> {
         args.iter().for_each(|&arg| {
             git.arg(arg);
         });
+        tracing::debug!("Running: {:?}", git);
         git.output().map(|output| output.stdout()).into_diagnostic()
     }
 }
