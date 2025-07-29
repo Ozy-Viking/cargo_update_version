@@ -27,7 +27,7 @@ A simple Cargo tool for updating the version in your project.
 Usage: cargo uv [OPTIONS] [ACTION] [SET_VERSION]
 
 Arguments:
-  [ACTION]       Action to affect the package version [default: patch] [possible values: patch, minor, major, set, print, tree]
+  [ACTION]       Action to affect the package version [default: print] [possible values: patch, minor, major, set, print, tree]
   [SET_VERSION]  New version to set. Ignored if action isn't set
 
 Options:
