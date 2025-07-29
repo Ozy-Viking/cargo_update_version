@@ -5,9 +5,13 @@
 ### Bug Fixes
 - **CI:** changed to build
 ### Features
+- update package versions and enhance workspace package handling
+- Moved over to tasks for workspace packages.
+- add workspace support and package filtering
 - **cli:** add workspace and git_ops modules and improve metadata handling
 - **cli:** change suppress flag to use value enum with default
 - **cli:** add suppress enum to control stdout output
+- **manifest:** enhance CargoFile version handling to handle workspace
 
 <a name="0.6.8+testing.10"></a>
 ## [0.6.8+testing.10] - 2025-07-14
