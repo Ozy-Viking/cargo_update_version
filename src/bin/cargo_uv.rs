@@ -1,16 +1,17 @@
 use std::env::args;
 
 use cargo_uv::{
-    Action, Cargo, Cli, FOOTER, GitBuilder, Package, Packages, Result, Task, Tasks, VersionType,
+    Action, Cargo, Cli, FOOTER, GitBuilder, Packages, Result, Task, Tasks, VersionType,
     setup_tracing,
 };
 use clap::CommandFactory;
-use miette::{Context, IntoDiagnostic, bail, ensure};
+use miette::{Context, IntoDiagnostic, ensure, miette};
 use rusty_viking::MietteDefaultConfig;
 
 use clap::FromArgMatches;
 fn main() -> Result<()> {
     // removes uv from from input
+    // BUG: #27 Cli ignores any use of 'uv' in args.
     let input = args().filter(|a| a != "uv").collect::<Vec<_>>();
     MietteDefaultConfig::init_set_panic_hook(Some(FOOTER.into()))?;
     let mut cli = Cli::command();
@@ -24,7 +25,7 @@ fn main() -> Result<()> {
     args.try_allow_dirty()?;
 
     let meta = args.get_metadata()?;
-    let packages = Packages::from(meta);
+    let mut packages = Packages::from(meta);
 
     match args.action() {
         Action::Print => {
@@ -56,9 +57,6 @@ fn main() -> Result<()> {
     drop(excluded);
 
     let mut change_workspace_package_version = false;
-    let workspace_root = args.get_metadata()?.workspace_root.as_std_path();
-    let mut workspace_package: Package<cargo_uv::ReadToml> =
-        Package::workspace_package(&workspace_root)?;
     let mut tasks = Tasks::new();
 
     for package in included {
@@ -105,26 +103,25 @@ fn main() -> Result<()> {
         }
     }
 
-    let mut new_version: Option<semver::Version> = None;
-    for task in tasks.version_change_tasks() {
-        match task {
+    for mut task in tasks.version_change_tasks() {
+        match &mut task {
             Task::Set {
                 version: new_version,
-                mut package,
+                package,
             } => {
-                package.set_version(new_version)?;
+                package.set_version(new_version.clone())?;
                 if !args.dry_run() {
                     package.write_cargo_file()?;
                 }
             }
             Task::Bump {
-                mut package,
+                package,
                 bump,
                 pre,
                 build,
                 force,
             } => {
-                package.bump_version(bump, pre, build, force)?;
+                package.bump_version(*bump, pre.clone(), build.clone(), *force)?;
                 if !args.dry_run() {
                     package.write_cargo_file()?;
                 }
@@ -135,19 +132,27 @@ fn main() -> Result<()> {
                 build,
                 force,
             } => {
-                new_version = Some(workspace_package.bump_version(bump, pre, build, force)?);
+                let workspace_package = packages.workspace_package().ok_or(miette!(
+                    "1 or more packages are expecting there to be a workspace.package"
+                ))?;
+                Some(workspace_package.bump_version(*bump, pre.clone(), build.clone(), *force)?);
                 if !args.dry_run() {
                     workspace_package.write_cargo_file()?;
                 }
             }
             Task::SetWorkspace { version } => {
-                new_version = Some(workspace_package.set_version(version)?);
+                let workspace_package = packages.workspace_package().ok_or(miette!(
+                    "1 or more packages are expecting there to be a workspace.package"
+                ))?;
+                Some(workspace_package.set_version(version.clone())?);
                 if !args.dry_run() {
                     workspace_package.write_cargo_file()?;
                 }
             }
             _ => unreachable!(),
         }
+        tracing::info!("Complete: {task}");
+        tasks.complete_task(&task);
     }
 
     Cargo::generate_lockfile(&args)?;
@@ -156,22 +161,19 @@ fn main() -> Result<()> {
         tracing::info!("Generating git tag");
         let root_dir = args.root_dir()?;
         let git = GitBuilder::new().root_directory(root_dir).build();
+        let new_version = packages.root_version()?;
 
         git.add_cargo_files()?;
-        if let Some(version) = new_version {
-            git.commit(&args, &version)?; // BUG: #26 Not handling the case when the message is set.
-            git.tag(&args, &version, None)?;
-            if args.git_push() {
-                let gpjh = git.push(&args, &version).context("git push")?;
-                tasks.append(gpjh);
-            }
-            // BUG: #2 Deletes tag before push so push fails.
-            if args.dry_run() {
-                let task = Task::DeleteGitTag(version);
-                tasks.insert(task, None);
-            }
-        } else {
-            bail!("Unable to commit or tag due to uncertainty of which tag to use.")
+        git.commit(&args, &new_version)?; // BUG: #26 Not handling the case when the message is set.
+        git.tag(&args, &new_version, None)?;
+        if args.git_push() {
+            let gpjh = git.push(&args, &new_version).context("git push")?;
+            tasks.append(gpjh);
+        }
+        // BUG: #2 Deletes tag before push so push fails.
+        if args.dry_run() {
+            let task = Task::DeleteGitTag(new_version);
+            tasks.insert(task, None);
         }
     }
 

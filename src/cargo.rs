@@ -40,7 +40,7 @@ impl Cargo {
 
         // BUG: Be able to remove --allow-dirty #1
         cargo.args(["--allow-dirty"]);
-        tracing::trace!("About to run: {:?}", &cargo);
+        tracing::debug!("Running: {:?}", cargo);
         cargo.spawn().into_diagnostic()
     }
 
@@ -52,6 +52,8 @@ impl Cargo {
                 .arg("--manifest-path")
                 .arg(cli_args.manifest.manifest_path.clone().unwrap());
         }
+
+        tracing::debug!("Running: {:?}", cargo);
         let output = cargo.output().into_diagnostic()?;
         if !output.status.success() {
             Err(

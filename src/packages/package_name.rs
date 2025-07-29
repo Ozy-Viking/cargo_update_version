@@ -1,4 +1,4 @@
-use std::{borrow::Borrow, fmt::Display, ops::DerefMut, str::FromStr};
+use std::{borrow::Borrow, fmt::Display, ops::DerefMut};
 
 /// Newtype around Package Name.
 ///

@@ -7,13 +7,28 @@ use semver::{BuildMetadata, Prerelease, Version};
 use std::path::{Path, PathBuf};
 use tracing::instrument;
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, Eq, Clone)]
 pub struct Package<CargoFileState> {
     name: PackageName,
     version_type: VersionType,
     version: Version,
     manifest_path: PathBuf,
     cargo_file: CargoFile<CargoFileState>,
+}
+
+impl<CargoFileState: PartialEq> PartialEq for Package<CargoFileState> {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name && self.manifest_path == other.manifest_path
+    }
+}
+
+impl<CargoFileState: std::hash::Hash> std::hash::Hash for Package<CargoFileState> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.name.hash(state);
+        // self.version_type.hash(state);
+        // self.manifest_path.hash(state);
+        // self.cargo_file.hash(state);
+    }
 }
 
 impl<CargoFileState> Package<CargoFileState> {
@@ -135,16 +150,16 @@ impl Package<ReadToml> {
         }
     }
 
-    pub fn workspace_package(workspace_root: &Path) -> Result<Package<ReadToml>> {
-        let manifest_path: PathBuf = workspace_root.join("Cargo.toml").into();
-        let cargo_file = CargoFile::new(&manifest_path)?;
+    #[track_caller]
+    pub fn workspace_package(manifest_path: &Path) -> Result<Package<ReadToml>> {
+        let cargo_file = CargoFile::new(manifest_path)?;
         let version = VersionLocation::WorkspacePackage.get_version(&cargo_file)?;
 
         Ok(Package {
             name: PackageName("workspace.package".into()),
             version_type: VersionType::WorkspacePackage,
             version,
-            manifest_path,
+            manifest_path: manifest_path.into(),
             cargo_file,
         })
     }

@@ -9,4 +9,6 @@ pub enum PackageError {
     #[error("Package name not provided")]
     #[diagnostic(code(PackageError::PackageNameNotProvided))]
     PackageNameNotProvided,
+    #[error("No root package or workspace package")]
+    NoRootVersion,
 }

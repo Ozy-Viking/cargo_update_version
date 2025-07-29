@@ -19,7 +19,7 @@ use cargo_metadata::Metadata;
 use semver::Version;
 use tracing::{debug, instrument};
 
-use crate::ReadToml;
+use crate::{ReadToml, Result, VersionLocation, display_path};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Packages {
@@ -28,11 +28,17 @@ pub struct Packages {
     /// Root package of the rust project.
     root_package: Option<PackageName>,
 
+    /// The root package version or if not present the workplace version.
+    root_version: Option<Version>,
+
     /// Default members
     default_members: HashSet<PackageName>,
 
     /// Hashmap of the packages in the rust project.
     packages: HashMap<PackageName, Package<ReadToml>>,
+
+    /// The package of the root Cargo.toml
+    workspace_package: Option<Package<ReadToml>>,
 }
 
 impl AsRef<HashMap<PackageName, Package<ReadToml>>> for Packages {
@@ -47,14 +53,16 @@ impl Packages {
         packages: &[P],
         root_package: Option<&P>,
         default_members: Vec<N>,
-    ) -> Self
+    ) -> Result<Self>
     where
         P: Into<Package<ReadToml>> + Clone,
         N: ToString + Clone,
     {
+        let workspace_package = Package::workspace_package(&path).ok();
         let mut ret = Self {
             root_manifest_path: path,
             root_package: None,
+            root_version: None,
             packages: HashMap::from_iter(packages.iter().map(|package| {
                 let package: Package<ReadToml> = package.clone().into();
                 (package.name().clone(), package)
@@ -62,14 +70,14 @@ impl Packages {
             default_members: HashSet::from_iter(
                 default_members.iter().map(|n| PackageName(n.to_string())),
             ),
+            workspace_package,
         };
         if let Some(root_package) = root_package {
-            ret.root_package = ret
-                .set_root_package_name(root_package.clone().into().name())
-                .cloned();
+            let root_package: Package<ReadToml> = root_package.clone().into();
+            ret.root_package = ret.set_root_package_name(root_package.name()).cloned();
+            ret.root_version = Some(root_package.version().clone());
         }
-
-        ret
+        Ok(ret)
     }
 
     #[instrument()]
@@ -185,6 +193,56 @@ impl Packages {
     pub(crate) fn get_root_package_version(&self) -> Option<Version> {
         self.get_root_package().map(|rp| rp.version().clone())
     }
+
+    /// Determine what the root version is for the packages.
+    ///
+    /// Order of checks:
+    /// - root version is set
+    /// - root package version
+    /// - workplace.package.version
+    /// - TODO: If all versions are the same use that version
+    ///
+    pub fn root_version(&self) -> Result<Version, PackageError> {
+        let error_no_root_package = PackageError::NoRootVersion;
+        if self.root_version.is_some() {
+            return Ok(self
+                .root_version
+                .as_ref()
+                .expect("There is a root version")
+                .clone());
+        };
+
+        // Checking the root package
+        if let Some(root_package_name) = &self.root_package {
+            let root_package = self.packages.get(root_package_name);
+            if let Some(root_package) = root_package {
+                return Ok(root_package.version().clone());
+            };
+        };
+
+        if let Some(workspace_package) = &self.workspace_package {
+            // Checking the workspace package
+            match VersionLocation::WorkspacePackage.get_version(workspace_package.cargo_file()) {
+                Ok(v) => return Ok(v),
+                Err(e) => match e.kind() {
+                    crate::VersionLocationErrorKind::SetByWorkspace => (),
+                    crate::VersionLocationErrorKind::NotFound(_) => (),
+                    crate::VersionLocationErrorKind::PackageNotFound => unreachable!(),
+                    crate::VersionLocationErrorKind::WorkspaceNotFound => {
+                        todo!("Workspace Not Found")
+                    }
+                    crate::VersionLocationErrorKind::ItemInvalid(_) => (),
+                    crate::VersionLocationErrorKind::SemverError(_) => (),
+                },
+            };
+        }
+
+        Err(error_no_root_package)
+    }
+
+    pub fn workspace_package(&mut self) -> Option<&mut Package<ReadToml>> {
+        self.workspace_package.as_mut()
+    }
 }
 
 impl Packages {
@@ -264,20 +322,27 @@ impl Packages {
     }
 }
 impl From<&Metadata> for Packages {
+    #[track_caller]
+    #[instrument(skip_all)]
     fn from(metadata: &Metadata) -> Self {
         let root_path = metadata.workspace_root.join("Cargo.toml");
+        tracing::debug!(
+            "Constructing Packages from Metadata: {}",
+            display_path!(root_path)
+        );
 
         let default_members = metadata
             .workspace_default_packages()
             .iter()
             .map(|p| p.name.clone())
             .collect::<Vec<_>>();
-
+        tracing::trace!("Default members {:?}", default_members);
         Self::new(
             root_path.into(),
             &metadata.packages,
             metadata.root_package(),
             default_members,
         )
+        .expect("From cargo metadata")
     }
 }

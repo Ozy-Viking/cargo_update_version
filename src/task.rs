@@ -1,11 +1,11 @@
 use std::{
     collections::{HashMap, HashSet},
+    fmt::Display,
     process::{Child, ExitStatus, Output},
 };
 
-use miette::bail;
 use semver::{BuildMetadata, Prerelease, Version};
-use tracing::{info, instrument, subscriber::SetGlobalDefaultError};
+use tracing::{info, instrument};
 
 use crate::{Action, OutputExt, Package, ReadToml, Result, current_span};
 
@@ -42,13 +42,24 @@ impl Tasks {
             .collect()
     }
 
-    /// [Vec] of completed [Task].
+    /// [Vec<Task>] of completed [Task].
     ///
     /// The underlying hashset can be accessed with [AsRef] and [AsMut]
-    pub fn complete_tasks(&self) -> Vec<Task> {
+    pub fn completed_tasks(&self) -> Vec<Task> {
         self.completed.iter().cloned().collect()
     }
 
+    pub fn complete_task(&mut self, task: &Task) -> bool {
+        self.completed.insert(task.clone())
+    }
+
+    pub fn all_tasks_but_delete_tag(&self) -> Vec<Task> {
+        self.tasks
+            .keys()
+            .filter(|&k| !k.is_delete_git_tag())
+            .cloned()
+            .collect()
+    }
     /// [bool] if remaining tasks exist based on [self.incomplete_tasks].
     pub fn remaining_tasks(&self) -> bool {
         !self.incomplete_tasks().is_empty()
@@ -71,7 +82,7 @@ impl Tasks {
     }
 }
 
-#[derive(Debug, Hash, PartialEq, Eq, Clone)]
+#[derive(Hash, PartialEq, Debug, Eq, Clone)]
 pub enum Task {
     Push(String),
     Publish,
@@ -98,6 +109,25 @@ pub enum Task {
         version: Version,
     },
     DeleteGitTag(Version),
+}
+
+impl Display for Task {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let text = match self {
+            Task::Push(remote) => &format!("Push to {remote}"),
+            Task::Publish => "Publish",
+            Task::Print => "Print",
+            Task::Tree => "Tree",
+            Task::Set { version, package } => {
+                &format!("Set {}: {}", package.name(), version.to_string())
+            }
+            Task::Bump { package, bump, .. } => &format!("Bump {bump}: {}", package.name()),
+            Task::BumpWorkspace { bump, .. } => &format!("Bump Workspace Package: {}", bump),
+            Task::SetWorkspace { version } => &format!("Set Workspace: {}", version.to_string()),
+            Task::DeleteGitTag(version) => &format!("Delete Git Tag: {}", version.to_string()),
+        };
+        write!(f, "{}", text)
+    }
 }
 
 impl Task {
@@ -208,7 +238,7 @@ impl Tasks {
                     Some(c) => c,
                     None => {
                         span.record("remaining_tasks", self.remaining_tasks_left());
-                        tracing::warn!("No child process existed for: {:?}", task);
+                        tracing::info!("No child process existed for: {}", task);
                         self.completed.insert(task);
                         continue 'tasks;
                     }
@@ -230,7 +260,7 @@ impl Tasks {
                     }
                 } else {
                     span.record("remaining_tasks", self.remaining_tasks_left());
-                    tracing::warn!("No child process existed for: {:?}", task);
+                    tracing::info!("No child process existed for: {}", task);
                     self.completed.insert(task);
                     continue 'tasks;
                 };
@@ -256,8 +286,11 @@ impl Tasks {
         }
 
         span.record("remaining_tasks", self.remaining_tasks_left());
-        assert_eq!(self.len(), self.complete_tasks().len());
-        info!("All {} task/s complete!", self.complete_tasks().len());
+        assert!(
+            self.all_tasks_but_delete_tag().len() == self.completed_tasks().len(),
+            "Tasks is not equal to completed tasks"
+        );
+        info!("All {} task/s complete!", self.completed_tasks().len());
         Ok(self)
     }
 }
@@ -270,7 +303,7 @@ impl TaskError {
         msg: impl Into<String>,
     ) -> Self {
         Self {
-            completed_tasks: tasks.complete_tasks(),
+            completed_tasks: tasks.completed_tasks(),
             incomplete_tasks: tasks.incomplete_tasks(),
             errored_task,
             output: output

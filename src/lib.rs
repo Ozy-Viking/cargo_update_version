@@ -63,3 +63,10 @@ macro_rules! current_span {
         tracing::span::Span::current()
     };
 }
+
+#[macro_export]
+macro_rules! display_path {
+    ($path:ident) => {
+        $path.as_os_str().display()
+    };
+}

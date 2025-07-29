@@ -1,5 +1,6 @@
 use std::{
     marker::PhantomData,
+    panic::Location,
     path::{Path, PathBuf},
 };
 
@@ -21,11 +22,20 @@ pub struct ReadToml;
 #[derive(Debug)]
 pub struct UnreadToml;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct CargoFile<State> {
     path: PathBuf,
     contents: Option<DocumentMut>,
     __state: PhantomData<State>,
+}
+
+impl<State: std::fmt::Debug> std::fmt::Debug for CargoFile<State> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CargoFile")
+            .field("path", &self.path)
+            .field("__state", &self.__state)
+            .finish()
+    }
 }
 
 impl<State: std::hash::Hash> std::hash::Hash for CargoFile<State> {
@@ -51,6 +61,7 @@ impl<'a, S> CargoFile<S> {
 
 impl CargoFile<UnreadToml> {
     #[instrument]
+    #[track_caller]
     pub fn new(path: impl Into<PathBuf> + std::fmt::Debug) -> miette::Result<CargoFile<ReadToml>> {
         let ret: CargoFile<UnreadToml> = Self::new_lazy(path.into());
         let ret: CargoFile<ReadToml> = ret.read_file()?;
@@ -67,13 +78,17 @@ impl CargoFile<UnreadToml> {
     }
 
     #[instrument(skip(self), fields(self.path))]
+    #[track_caller]
     pub fn read_file(self) -> miette::Result<CargoFile<ReadToml>> {
         let CargoFile { path, .. } = self;
         let contents = match ::std::fs::read_to_string(&path) {
             Ok(contents) => contents,
             Err(e) => {
-                tracing::error!("Failed to read to string: {}", e);
-                bail!("Tried to read file to string: {}", e)
+                let msg = format!("Failed to read to string: {} - {}", e, path.display());
+                tracing::error!(msg);
+                let loc = Location::caller().to_string();
+                tracing::error!(loc);
+                bail!(msg)
             }
         };
 

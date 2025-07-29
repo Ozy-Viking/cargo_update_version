@@ -49,12 +49,12 @@ impl VersionLocation {
         let document = cargo_toml
             .contents()
             .expect("Can't call this function without the document read.");
-        trace!("have document");
+        tracing::trace!("have document");
         let ret = match self {
             VersionLocation::Package => {
                 let package = document
                     .get("package")
-                    .ok_or(set_err(ErrKind::PackageNotFound, None))?;
+                    .ok_or(ErrKind::PackageNotFound.to_error(path, Some("First check")))?;
 
                 let package_table = package.as_table().ok_or_else(|| {
                     set_err(
@@ -107,7 +107,7 @@ impl VersionLocation {
                 })?;
                 let package = workspace
                     .get("package")
-                    .ok_or(set_err(ErrKind::PackageNotFound, None))?;
+                    .ok_or(ErrKind::PackageNotFound.to_error(path, Some("")))?;
 
                 let package = package.as_table().ok_or_else(|| {
                     set_err(
