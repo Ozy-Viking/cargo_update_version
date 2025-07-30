@@ -12,32 +12,8 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  check:
-    strategy:
-      fail-fast: true
-      matrix:
-        include:
-          - target: x86_64-unknown-linux-gnu
-            os: ubuntu-latest
-          - target: x86_64-apple-darwin
-            os: macos-latest
-          - target: x86_64-pc-windows-msvc
-            os: windows-latest
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: Check
-        run: cargo build --release --verbose --target ${{ matrix.target }}
-      - name: Run tests
-        run: cargo test --release --verbose --target ${{ matrix.target }}
-      - name: Upload Binary
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{matrix.os}}-${{matrix.target}}-release
-          path: |
-            target/${{ matrix.target }}/release/**
   create-release:
-    needs: check
+    # needs: check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -49,10 +25,10 @@ jobs:
           # branch: main
           # (required) GitHub token for creating GitHub Releases.
           token: ${{ secrets.GITHUB_TOKEN }}
-
-  upload-assets:
-    needs: create-release
+          draft: true
+  check-and-upload:
     strategy:
+      fail-fast: false
       matrix:
         include:
           - target: x86_64-unknown-linux-gnu
@@ -64,15 +40,13 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          name: ${{matrix.os}}-${{matrix.target}}-release
-          path: target/${{ matrix.target }}/release/
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Display structure of downloaded files
-        run: ls -R target
-
+          targets: "${{ matrix.target }}"
+      - name: Check
+        run: cargo build --release --verbose --target ${{ matrix.target }}
+      - name: Run tests
+        run: cargo test --release --verbose --target ${{ matrix.target }}
       - uses: taiki-e/upload-rust-binary-action@v1
         with:
           # (required) Comma-separated list of binary names (non-extension portion of filename) to build and upload.
