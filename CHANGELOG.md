@@ -1,5 +1,9 @@
 # Changelog
 
+<a name="Upcoming Changes"></a>
+## [Upcoming Changes]
+### Bug Fixes
+- **CICD:** GHA -  Forcing apple target to be installed.
 
 <a name="0.7.1"></a>
 ## [0.7.1] - 2025-07-29
