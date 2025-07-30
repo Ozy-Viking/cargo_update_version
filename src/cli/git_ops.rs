@@ -33,6 +33,11 @@ pub struct GitOps {
     #[arg(long, default_value = Branch::default(), hide_default_value(true), help_heading = GIT_HEADER)]
     branch: Branch,
 }
+impl GitOps {
+    pub fn branch(&self) -> Branch {
+        self.branch.clone()
+    }
+}
 
 #[derive(Debug, PartialEq, Eq, Default, Clone)]
 pub enum Branch {
@@ -41,6 +46,40 @@ pub enum Branch {
     Other {
         local: String,
     },
+}
+
+impl Branch {
+    /// Returns `true` if the branch is [`Current`].
+    ///
+    /// [`Current`]: Branch::Current
+    #[must_use]
+    pub fn is_current(&self) -> bool {
+        matches!(self, Self::Current)
+    }
+
+    /// Returns `true` if the branch is [`Other`].
+    ///
+    /// [`Other`]: Branch::Other
+    #[must_use]
+    pub fn is_other(&self) -> bool {
+        matches!(self, Self::Other { .. })
+    }
+
+    pub fn as_other(&self) -> Option<&String> {
+        if let Self::Other { local } = self {
+            Some(local)
+        } else {
+            None
+        }
+    }
+
+    pub fn try_into_other(self) -> Result<String, Self> {
+        if let Self::Other { local } = self {
+            Ok(local)
+        } else {
+            Err(self)
+        }
+    }
 }
 
 impl Display for Branch {

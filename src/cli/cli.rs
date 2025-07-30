@@ -1,7 +1,7 @@
 use std::{ops::Deref, path::PathBuf};
 
 use crate::{
-    Action, GitBuilder, Result,
+    Action, Branch, GitBuilder, Result,
     cli::{CARGO_HEADER, GitOps, Manifest, Suppress, Workspace},
 };
 use cargo_metadata::Metadata;
@@ -210,6 +210,14 @@ impl Cli {
 
     pub fn no_verify(&self) -> bool {
         self.no_verify
+    }
+
+    pub fn git_branch(&self) -> Branch {
+        self.git_ops.branch()
+    }
+
+    pub fn is_current_branch(&self) -> bool {
+        self.git_branch().is_current()
     }
 
     // /// Partition workspace members into those selected and those excluded.

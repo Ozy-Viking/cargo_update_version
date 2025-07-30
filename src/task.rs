@@ -33,7 +33,7 @@ impl Tasks {
         self.keys().cloned().collect()
     }
 
-    /// [Vec<Task>] of incomplete tasks.
+    /// [`Vec<Task>`] of incomplete tasks.
     pub fn incomplete_tasks(&self) -> Vec<Task> {
         self.tasks
             .keys()
@@ -42,7 +42,7 @@ impl Tasks {
             .collect()
     }
 
-    /// [Vec<Task>] of completed [Task].
+    /// [`Vec<Task>`] of completed [Task].
     ///
     /// The underlying hashset can be accessed with [AsRef] and [AsMut]
     pub fn completed_tasks(&self) -> Vec<Task> {

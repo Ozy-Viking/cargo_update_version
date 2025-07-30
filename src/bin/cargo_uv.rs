@@ -1,7 +1,7 @@
 use std::env::args;
 
 use cargo_uv::{
-    Action, Cargo, Cli, FOOTER, GitBuilder, Packages, Result, Task, Tasks, VersionType,
+    Action, Cargo, Cli, FOOTER, GitBuilder, Packages, Result, Stash, Task, Tasks, VersionType,
     setup_tracing,
 };
 use clap::CommandFactory;
@@ -22,6 +22,14 @@ fn main() -> Result<()> {
     let mut args = Cli::from_arg_matches(&cli.get_matches_from(&input)).into_diagnostic()?;
 
     setup_tracing(&args)?;
+    let root_dir = args.root_dir()?;
+    let git = GitBuilder::new().root_directory(root_dir).build();
+
+    let starting_branch = if args.git_branch().is_other() {
+        Some(git.checkout(&args, args.git_branch(), Stash::Unstashed)?)
+    } else {
+        None
+    };
     args.try_allow_dirty()?;
 
     let meta = args.get_metadata()?;
@@ -103,6 +111,7 @@ fn main() -> Result<()> {
             tasks.insert(t, None);
         }
     }
+    // BUG: #43 Need to undo tasks on failure e.g. checkout, stash ...
 
     for mut task in tasks.version_change_tasks() {
         match &mut task {
@@ -160,8 +169,7 @@ fn main() -> Result<()> {
 
     if args.git_tag() {
         tracing::info!("Generating git tag");
-        let root_dir = args.root_dir()?;
-        let git = GitBuilder::new().root_directory(root_dir).build();
+
         let new_version = packages.root_version()?;
 
         git.add_cargo_files()?;
@@ -199,5 +207,9 @@ fn main() -> Result<()> {
         let git = GitBuilder::new().root_directory(root_dir).build();
         git.tag(&args, version, Some(vec!["--delete"]))?;
     };
+
+    if let Some((branch, stash)) = starting_branch {
+        git.checkout(&args, branch, stash)?;
+    }
     Ok(())
 }
