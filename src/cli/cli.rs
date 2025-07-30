@@ -1,15 +1,9 @@
-mod action;
-mod git_ops;
-mod manifest;
-mod suppress;
-mod workspace;
-
-pub use crate::cli::{
-    action::Action, git_ops::GitOps, manifest::Manifest, suppress::Suppress, workspace::Workspace,
-};
 use std::{ops::Deref, path::PathBuf};
 
-use crate::{GitBuilder, Result};
+use crate::{
+    Action, Branch, GitBuilder, Result,
+    cli::{CARGO_HEADER, GitOps, Manifest, Suppress, Workspace},
+};
 use cargo_metadata::Metadata;
 use miette::IntoDiagnostic;
 use semver::Version;
@@ -17,10 +11,6 @@ use tracing::{Level, debug, instrument};
 
 use crate::current_span;
 // use clap::ValueHint;
-
-static GIT_HEADER: &str = "Git";
-static CARGO_HEADER: &str = "Cargo";
-static WORKSPACE_HEADER: &str = "Package Selection";
 
 pub const CLAP_STYLING: clap::builder::styling::Styles = clap::builder::styling::Styles::styled()
     .header(clap_cargo::style::HEADER)
@@ -220,6 +210,14 @@ impl Cli {
 
     pub fn no_verify(&self) -> bool {
         self.no_verify
+    }
+
+    pub fn git_branch(&self) -> Branch {
+        self.git_ops.branch()
+    }
+
+    pub fn is_current_branch(&self) -> bool {
+        self.git_branch().is_current()
     }
 
     // /// Partition workspace members into those selected and those excluded.

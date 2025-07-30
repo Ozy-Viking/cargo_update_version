@@ -33,7 +33,7 @@ impl Tasks {
         self.keys().cloned().collect()
     }
 
-    /// [Vec<Task>] of incomplete tasks.
+    /// [`Vec<Task>`] of incomplete tasks.
     pub fn incomplete_tasks(&self) -> Vec<Task> {
         self.tasks
             .keys()
@@ -42,7 +42,7 @@ impl Tasks {
             .collect()
     }
 
-    /// [Vec<Task>] of completed [Task].
+    /// [`Vec<Task>`] of completed [Task].
     ///
     /// The underlying hashset can be accessed with [AsRef] and [AsMut]
     pub fn completed_tasks(&self) -> Vec<Task> {
@@ -109,6 +109,10 @@ pub enum Task {
         version: Version,
     },
     DeleteGitTag(Version),
+    ChangeBranch {
+        to: String,
+        from: String,
+    },
 }
 
 impl Display for Task {
@@ -125,6 +129,7 @@ impl Display for Task {
             Task::BumpWorkspace { bump, .. } => &format!("Bump Workspace Package: {}", bump),
             Task::SetWorkspace { version } => &format!("Set Workspace: {}", version.to_string()),
             Task::DeleteGitTag(version) => &format!("Delete Git Tag: {}", version.to_string()),
+            Task::ChangeBranch { to, .. } => &format!("Change branch: {}", to),
         };
         write!(f, "{}", text)
     }
@@ -133,9 +138,13 @@ impl Display for Task {
 impl Task {
     pub fn is_version_change(&self) -> bool {
         match self {
-            Task::Push(_) | Task::Publish | Task::Print | Task::DeleteGitTag(_) | Task::Tree => {
-                false
-            }
+            Task::ChangeBranch { .. }
+            | Task::Push(_)
+            | Task::Publish
+            | Task::Print
+            | Task::DeleteGitTag(_)
+            | Task::Tree => false,
+
             Task::Set { .. }
             | Task::Bump { .. }
             | Task::BumpWorkspace { .. }

@@ -1,15 +1,21 @@
 use std::{
     fmt::Debug,
     path::{Path, PathBuf},
-    process::{Child, Command, Output, Stdio},
+    process::{Child, Command, Stdio},
     str::FromStr,
 };
 
-use miette::{Context, IntoDiagnostic, bail};
+use miette::{Context, bail};
 use semver::Version;
 use tracing::{debug, info, instrument, warn};
 
-use crate::{Task, cli::Cli, current_span, git::git_file::GitFiles};
+use crate::{
+    Branch, Process, ProcessOutput, Result, Task,
+    cli::{Cli, Suppress},
+    current_span,
+    git::git_file::GitFiles,
+    process::OutputExt,
+};
 
 /// Used to indicate if the Root Dir is Set and can be used.
 #[derive(Debug)]
@@ -128,8 +134,7 @@ impl Git<PathBuf> {
 
         info!("Staging cargo files: {}, {}", cargo_toml, cargo_lock);
         git.args(["add", "-v", cargo_toml, cargo_lock, all_cargo_toml]);
-        tracing::debug!("Running: {:?}", git);
-        git.output().map(|_| ()).into_diagnostic()
+        Process::Output.run(git).map(|_| ())
     }
 }
 
@@ -137,10 +142,12 @@ impl Git<PathBuf> {
     /// Generates a list of dirty files.
     #[instrument(skip_all)]
     pub fn dirty_files(&self) -> miette::Result<GitFiles> {
-        let mut git_status = self.command(true);
-        git_status.args(["status", "--short"]);
-        tracing::debug!("Running: {:?}", git_status);
-        let stdout = git_status.output().into_diagnostic()?.stdout();
+        let mut git = self.command(true);
+        git.args(["status", "--short"]);
+        let stdout = match Process::Output.run(git)? {
+            ProcessOutput::Output(output) => output.stdout(),
+            _ => unreachable!(),
+        };
         if stdout.lines().count() == 0 {
             return Ok(GitFiles::new());
         };
@@ -168,8 +175,10 @@ impl Git<PathBuf> {
             }
         }
 
-        tracing::debug!("Running: {:?}", git);
-        let _stdout = git.output().into_diagnostic()?;
+        let _stdout = match Process::Output.run(git)? {
+            ProcessOutput::Output(output) => output.stdout(),
+            _ => unreachable!(),
+        };
         self.dirty_files().context("After Commit")?;
         Ok(())
     }
@@ -187,8 +196,10 @@ impl Git<PathBuf> {
             git.args(a);
         }
         git.args([&self.generate_tag(version)]);
-        tracing::debug!("Running: {:?}", git);
-        let output = git.output().into_diagnostic()?;
+        let output = match Process::Output.run(git)? {
+            ProcessOutput::Output(output) => output,
+            _ => unreachable!(),
+        };
         if !output.status.success() {
             tracing::debug!("stderr: {}", output.stderr());
             bail!("Failed to tag repository.")
@@ -220,9 +231,13 @@ impl Git<PathBuf> {
                     git_push.arg("--dry-run");
                 }
                 git_push.args([remote.as_str(), &tag_string, "--porcelain"]);
-                // let _ = dbg!(git_push.get_args());
                 tracing::debug!("Running: {:?}", git_push);
-                (task, git_push.spawn().into_diagnostic())
+                let child = match Process::Spawn.run(git_push) {
+                    Ok(ProcessOutput::Child(child)) => Ok(child),
+                    Err(e) => Err(e),
+                    _ => unreachable!(),
+                };
+                (task, child)
             })
             .collect::<Vec<_>>();
         let mut ret = vec![];
@@ -241,14 +256,13 @@ impl Git<PathBuf> {
     pub fn remotes(&self) -> miette::Result<Vec<String>> {
         let mut git = self.command(true);
         git.args(["remote"]);
-        tracing::debug!("Running: {:?}", git);
-        let remotes: Vec<String> = git
-            .output()
-            .into_diagnostic()?
-            .stdout()
-            .lines()
-            .map(String::from)
-            .collect();
+
+        let stdout = match Process::Output.run(git)? {
+            ProcessOutput::Output(output) => output.stdout(),
+            _ => unreachable!(),
+        };
+
+        let remotes: Vec<String> = stdout.lines().map(String::from).collect();
 
         let mut branch_remotes = Vec::new();
 
@@ -257,7 +271,10 @@ impl Git<PathBuf> {
                 Some((remote, _branch)) => remote.trim().to_string(),
                 None => {
                     warn!("Ensure you only run command on a branch with a remote.");
-                    bail!("Failed to find remote for current branch.")
+                    bail!(
+                        help = "Use the branch flag to change to valid branch",
+                        "Failed to find remote for current branch."
+                    )
                 }
             };
             assert!(remotes.contains(&valid_remote));
@@ -275,6 +292,11 @@ impl Git<PathBuf> {
         Ok(branch_remotes)
     }
 
+    /// Runs `git branch` with any additional arguments.
+    ///
+    /// ## Errors
+    ///
+    /// This function will return an error if the [Command] fails.
     #[instrument(skip_all)]
     pub fn branch(&self, args: Vec<&str>) -> miette::Result<String> {
         let mut git = self.command(true);
@@ -282,23 +304,148 @@ impl Git<PathBuf> {
         args.iter().for_each(|&arg| {
             git.arg(arg);
         });
-        tracing::debug!("Running: {:?}", git);
-        git.output().map(|output| output.stdout()).into_diagnostic()
+        let stdout = match Process::Output.run(git)? {
+            ProcessOutput::Output(output) => output.stdout(),
+            _ => unreachable!(),
+        };
+        Ok(stdout)
+    }
+
+    #[instrument(skip_all, fields(from, to, stash_revert_required))]
+    pub fn checkout(
+        &self,
+        cli_args: &Cli,
+        branch: Branch,
+        stash_state: Stash,
+    ) -> Result<(Branch, Stash)> {
+        let span = current_span!();
+        // Determine current branch to return.
+        let mut cmd = self.command(false);
+        cmd.args(["branch", "--show-current"]);
+        cmd.stdout(Stdio::piped());
+
+        let current_branch = match Process::Output.run(cmd) {
+            Ok(output) => match output {
+                ProcessOutput::Output(b) => {
+                    if b.status.success() {
+                        b.stdout().trim_end().to_string()
+                    } else {
+                        miette::bail!(
+                            help = "Failed to run 'git branch --show-current'",
+                            "{}",
+                            b.stderr()
+                        );
+                    }
+                }
+                _ => unreachable!(),
+            },
+            Err(e) => Err(e.wrap_err("Failed to run 'git branch --show-current'"))?,
+        };
+        span.record("from", &current_branch);
+        span.record("to", branch.to_string());
+
+        let ret_branch = Branch::Other {
+            local: current_branch,
+        };
+        tracing::debug!("{:?}", ret_branch);
+
+        // check if need to stash.
+        // TODO: use `git stash {create, store, apply, drop}`
+        let revert_stash = self.stash(cli_args.suppress, stash_state)?;
+
+        // Changing branch
+        let mut cmd = self.command(cli_args.suppress.includes_git());
+
+        if let Branch::Other { local } = &branch {
+            cmd.args(["checkout", local.as_ref()]);
+        } else {
+            bail!("Can't change branch to current branch.")
+        };
+
+        let output = match Process::Output
+            .run(cmd)
+            .context(format!("Failed to run: git checkout {}", &branch))?
+        {
+            ProcessOutput::Output(output) => output,
+            _ => unreachable!(),
+        };
+
+        if !output.status.success() {
+            miette::bail!(
+                help = "Failed to run 'git branch --show-current'",
+                "{}",
+                output.stderr()
+            );
+        }
+
+        Ok((ret_branch, revert_stash))
+    }
+
+    pub fn stash(&self, suppress: Suppress, state: Stash) -> Result<Stash> {
+        // TODO: Ensure no dirty files after stash.
+        let files = self.dirty_files()?;
+        let mut ret_stash: Stash = state;
+
+        let mut git = self.command(suppress.includes_git());
+        git.arg("stash");
+
+        match state {
+            Stash::Stashed => {
+                git.arg("pop");
+                ret_stash = Stash::Unstashed
+            }
+            Stash::Unstashed => {
+                if !files.is_empty() {
+                    git.arg("push");
+                    ret_stash = Stash::Stashed
+                }
+            }
+            Stash::Dont => return Ok(state),
+        };
+        let command = Process::display_command(&git);
+        let run = Process::Output.run(git)?;
+
+        let output = run.as_output().unwrap();
+        if !output.status.success() {
+            miette::bail!(
+                help = format!("Failed to run '{}'", command),
+                "{}",
+                output.stderr()
+            );
+        };
+        Ok(ret_stash)
     }
 }
 
-#[allow(dead_code)]
-pub trait OutputExt {
-    fn stderr(&self) -> String;
-    fn stdout(&self) -> String;
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Default)]
+pub enum Stash {
+    Stashed,
+    #[default]
+    Unstashed,
+    Dont,
 }
 
-impl OutputExt for Output {
-    fn stderr(&self) -> String {
-        String::from_iter(self.stderr.iter().map(|&c| char::from(c)))
+impl Stash {
+    /// Returns `true` if the stash is [`Stashed`].
+    ///
+    /// [`Stashed`]: Stash::Stashed
+    #[must_use]
+    pub fn is_stashed(&self) -> bool {
+        matches!(self, Self::Stashed)
     }
 
-    fn stdout(&self) -> String {
-        String::from_iter(self.stdout.iter().map(|&c| char::from(c)))
+    /// Returns `true` if the stash is [`Stashed`].
+    ///
+    /// [`Stashed`]: Stash::Stashed
+    pub fn revert_required(&self) -> bool {
+        self.is_stashed()
+    }
+
+    /// Returns `true` if the stash is [`Unstashed`].
+    ///
+    /// [`Unstashed`]: Stash::Unstashed
+    #[must_use]
+    pub fn is_unstashed(&self) -> bool {
+        matches!(self, Self::Unstashed)
     }
 }

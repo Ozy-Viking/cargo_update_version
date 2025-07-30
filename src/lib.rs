@@ -6,12 +6,13 @@ pub(crate) mod error;
 pub(crate) mod git;
 pub(crate) mod manifest;
 pub(crate) mod packages;
+pub(crate) mod process;
 pub(crate) mod task;
 pub(crate) mod version;
 
 pub use cargo::Cargo;
-pub use cli::{Action, Cli};
-pub use git::{Git, GitBuilder, GitFile, GitFiles, NoRootDirSet, OutputExt};
+pub use cli::{Action, Branch, Cli};
+pub use git::{Git, GitBuilder, GitFile, GitFiles, NoRootDirSet, Stash};
 pub use manifest::error::{
     CargoFileError, CargoFileErrorKind, ItemType, VersionLocationErrorKind, VersionlocationError,
 };
@@ -20,6 +21,7 @@ pub use manifest::toml_file::{CargoFile, ReadToml, UnreadToml};
 pub use manifest::version_location::{VersionLocation, VersionType};
 pub use miette::Result;
 pub use packages::{Package, PackageError, PackageName, Packages};
+pub use process::{OutputExt, Process, ProcessOutput};
 pub use task::{Task, TaskError, Tasks};
 pub use version::{Bumpable, Setable};
 
@@ -27,6 +29,7 @@ use miette::{IntoDiagnostic, bail};
 use tracing::Level;
 use tracing_subscriber::util::SubscriberInitExt;
 
+/// Footer for the [miette::MietteHandler]
 pub static FOOTER: &str = "If the bug continues, raise an issue on github: https://github.com/Ozy-Viking/cargo_update_version/issues";
 
 pub fn setup_tracing(args: &Cli) -> miette::Result<()> {
