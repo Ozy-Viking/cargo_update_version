@@ -1,4 +1,4 @@
-use std::{path::PathBuf, str::FromStr};
+use std::{path::PathBuf, str::FromStr, vec::IntoIter};
 
 use tracing::instrument;
 
@@ -94,5 +94,15 @@ impl GitFiles {
         } else {
             Some(GitFiles(ret))
         }
+    }
+}
+
+impl IntoIterator for GitFiles {
+    type Item = GitFile;
+
+    type IntoIter = IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
     }
 }

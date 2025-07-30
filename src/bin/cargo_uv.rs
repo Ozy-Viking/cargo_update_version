@@ -56,6 +56,7 @@ fn main() -> Result<()> {
     );
     drop(excluded);
 
+    // BUG: #40 Not using the the '--workspace-package' flag.
     let mut change_workspace_package_version = false;
     let mut tasks = Tasks::new();
 

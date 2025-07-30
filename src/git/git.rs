@@ -9,7 +9,9 @@ use miette::{Context, IntoDiagnostic, bail};
 use semver::Version;
 use tracing::{debug, info, instrument, warn};
 
-use crate::{Task, cli::Cli, current_span, git::git_file::GitFiles};
+use crate::{
+    Branch, Result, Task, cli::Cli, current_span, git::git_file::GitFiles, process::OutputExt,
+};
 
 /// Used to indicate if the Root Dir is Set and can be used.
 #[derive(Debug)]
@@ -275,6 +277,11 @@ impl Git<PathBuf> {
         Ok(branch_remotes)
     }
 
+    /// Runs `git branch` with any additional arguments.
+    ///
+    /// ## Errors
+    ///
+    /// This function will return an error if the [Command] fails.
     #[instrument(skip_all)]
     pub fn branch(&self, args: Vec<&str>) -> miette::Result<String> {
         let mut git = self.command(true);
@@ -285,20 +292,71 @@ impl Git<PathBuf> {
         tracing::debug!("Running: {:?}", git);
         git.output().map(|output| output.stdout()).into_diagnostic()
     }
-}
 
-#[allow(dead_code)]
-pub trait OutputExt {
-    fn stderr(&self) -> String;
-    fn stdout(&self) -> String;
-}
+    #[instrument(skip_all, fields(from, to, stash_revert_required))]
+    pub fn checkout(&self, cli_args: &Cli, branch: Branch) -> Result<(Branch, bool)> {
+        let span = current_span!();
+        // Determine current branch to return.
+        let current_branch = match self
+            .command(false)
+            .args(["branch", "--show-current"])
+            .output()
+        {
+            Ok(b) => {
+                if b.status.success() {
+                    b.stdout()
+                } else {
+                    miette::bail!(
+                        help = "Failed to run 'git branch --show-current'",
+                        "{}",
+                        b.stderr()
+                    );
+                }
+            }
+            Err(e) => miette::bail!(help = "Failed to run 'git branch --show-current'", "{}", e),
+        };
+        span.record("from", &current_branch);
+        span.record("to", branch.to_string());
 
-impl OutputExt for Output {
-    fn stderr(&self) -> String {
-        String::from_iter(self.stderr.iter().map(|&c| char::from(c)))
-    }
+        let ret_branch = Branch::Other {
+            local: current_branch,
+        };
 
-    fn stdout(&self) -> String {
-        String::from_iter(self.stdout.iter().map(|&c| char::from(c)))
+        // check if need to stash.
+        // TODO: use `git stash {create, store, apply, drop}`
+        let files = self.dirty_files()?;
+        let mut revert_stash = false;
+        if !files.is_empty() {
+            let mut cmd = self.command(cli_args.suppress.includes_git());
+            cmd.args(["stash", "push"]);
+            tracing::debug!("Running: {:?}", cmd);
+            cmd.output().into_diagnostic()?;
+            revert_stash = true;
+        };
+
+        // Changing branch
+        let mut cmd = self.command(cli_args.suppress.includes_git());
+
+        if let Branch::Other { local } = &branch {
+            cmd.args(["checkout", local.as_ref()]);
+        } else {
+            bail!("Can't change branch to current branch.")
+        };
+
+        tracing::debug!("Running: {:?}", cmd);
+        let output = cmd
+            .output()
+            .into_diagnostic()
+            .context(format!("Failed to run: git checkout {}", &branch))?;
+
+        if !output.status.success() {
+            miette::bail!(
+                help = "Failed to run 'git branch --show-current'",
+                "{}",
+                output.stderr()
+            );
+        }
+
+        Ok((ret_branch, revert_stash))
     }
 }
