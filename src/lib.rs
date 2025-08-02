@@ -7,7 +7,7 @@ pub(crate) mod git;
 pub(crate) mod manifest;
 pub(crate) mod packages;
 pub(crate) mod process;
-pub(crate) mod task;
+pub(crate) mod tasks;
 pub(crate) mod version;
 
 pub use cargo::Cargo;
@@ -22,7 +22,7 @@ pub use manifest::version_location::{VersionLocation, VersionType};
 pub use miette::Result;
 pub use packages::{Package, PackageError, PackageName, Packages};
 pub use process::{OutputExt, Process, ProcessOutput};
-pub use task::{Task, TaskError, Tasks};
+pub use tasks::{Task, TaskError, Tasks};
 pub use version::{Bumpable, Setable};
 
 use miette::{IntoDiagnostic, bail};

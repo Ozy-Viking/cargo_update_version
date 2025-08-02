@@ -351,6 +351,7 @@ impl Git<PathBuf> {
 
         // check if need to stash.
         // TODO: use `git stash {create, store, apply, drop}`
+        // BUG: #46 Always stashing before swithching which is incorrect when undoing.
         let revert_stash = self.stash(cli_args.suppress, stash_state)?;
 
         // Changing branch
