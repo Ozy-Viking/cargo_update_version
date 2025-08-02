@@ -1,6 +1,7 @@
 use std::{fmt::Display, process::Child};
 
 use semver::{BuildMetadata, Prerelease, Version};
+use tracing::instrument;
 
 use crate::{Action, Cli, Package, Packages, ReadToml, Result};
 
@@ -114,9 +115,12 @@ impl Task {
 }
 
 impl Task {
+    #[track_caller]
+    #[instrument(name = "Task::run()")]
+    /// Run the core function for the task.
     pub fn run(&mut self, packages: Packages) -> Result<Option<Child>> {
-        // TODO: Run action
-        match self {
+        tracing::debug!("Starting task: {}", self);
+        let ret = match self {
             Task::Push(_) => todo!(),
             Task::Publish => todo!(),
             Task::Print => {
@@ -145,6 +149,8 @@ impl Task {
             Task::SetWorkspace { version } => todo!(),
             Task::DeleteGitTag(version) => todo!(),
             Task::ChangeBranch { to, from } => todo!(),
-        }
+        };
+        tracing::trace!("Finishing task: {} with status Ok:{}", self, ret.is_ok());
+        ret
     }
 }

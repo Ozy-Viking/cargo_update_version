@@ -1,7 +1,7 @@
 use std::{ops::Deref, path::PathBuf};
 
 use crate::{
-    Action, Branch, GitBuilder, Result,
+    Action, Branch, Cargo, Git, GitBuilder, Result,
     cli::{CARGO_HEADER, GitOps, Manifest, Suppress, Workspace},
 };
 use cargo_metadata::Metadata;
@@ -225,6 +225,32 @@ impl Cli {
 
     pub fn display_tasks(&self) -> bool {
         self.display_tasks
+    }
+
+    pub fn workspace_package(&self) -> bool {
+        self.workspace_package
+    }
+
+    pub(crate) fn workspace(&self) -> &Workspace {
+        &self.workspace
+    }
+
+    pub fn git(&self) -> Result<Git<PathBuf>> {
+        Ok(GitBuilder::new().root_directory(self.root_dir()?).build())
+    }
+
+    pub fn cargo(&self) -> Result<Cargo> {
+        let cargo;
+        if let Some(path) = self.manifest.manifest_path.as_ref() {
+            if path.is_dir() {
+                cargo = Cargo::new(Some(path.join("Cargo.toml")));
+            } else {
+                cargo = Cargo::new(Some(path.to_path_buf()));
+            }
+        } else {
+            cargo = Cargo::default();
+        }
+        Ok(cargo)
     }
 
     // /// Partition workspace members into those selected and those excluded.

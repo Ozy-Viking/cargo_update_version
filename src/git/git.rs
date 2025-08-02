@@ -311,19 +311,12 @@ impl Git<PathBuf> {
         Ok(stdout)
     }
 
-    #[instrument(skip_all, fields(from, to, stash_revert_required))]
-    pub fn checkout(
-        &self,
-        cli_args: &Cli,
-        branch: Branch,
-        stash_state: Stash,
-    ) -> Result<(Branch, Stash)> {
-        let span = current_span!();
+    #[instrument(skip_all)]
+    pub fn current_branch(&self) -> Result<Branch> {
         // Determine current branch to return.
         let mut cmd = self.command(false);
         cmd.args(["branch", "--show-current"]);
         cmd.stdout(Stdio::piped());
-
         let current_branch = match Process::Output.run(cmd) {
             Ok(output) => match output {
                 ProcessOutput::Output(b) => {
@@ -341,18 +334,31 @@ impl Git<PathBuf> {
             },
             Err(e) => Err(e.wrap_err("Failed to run 'git branch --show-current'"))?,
         };
-        span.record("from", &current_branch);
-        span.record("to", branch.to_string());
-
-        let ret_branch = Branch::Other {
+        Ok(Branch::Other {
             local: current_branch,
-        };
-        tracing::debug!("{:?}", ret_branch);
+        })
+    }
+    #[instrument(skip_all, fields(from, to, stash_revert_required))]
+    pub fn checkout(
+        &self,
+        cli_args: &Cli,
+        branch: Branch,
+        stash_state: Stash,
+    ) -> Result<(Branch, Stash)> {
+        let current_branch = self.current_branch()?;
 
-        // check if need to stash.
-        // TODO: use `git stash {create, store, apply, drop}`
-        // BUG: #46 Always stashing before swithching which is incorrect when undoing.
-        let revert_stash = self.stash(cli_args.suppress, stash_state)?;
+        let span = current_span!();
+        span.record("from", current_branch.as_ref());
+        span.record("to", branch.as_ref());
+
+        tracing::debug!("{:?}", current_branch);
+
+        // Check if need to stash.
+        // #46
+        let mut revert_stash = Stash::Dont;
+        if stash_state.is_unstashed() {
+            revert_stash = self.stash(cli_args.suppress, stash_state)?;
+        }
 
         // Changing branch
         let mut cmd = self.command(cli_args.suppress.includes_git());
@@ -379,10 +385,16 @@ impl Git<PathBuf> {
             );
         }
 
-        Ok((ret_branch, revert_stash))
+        // #46
+        if stash_state.is_stashed() {
+            revert_stash = self.stash(cli_args.suppress, stash_state)?;
+        }
+
+        Ok((current_branch, revert_stash))
     }
 
     pub fn stash(&self, suppress: Suppress, state: Stash) -> Result<Stash> {
+        // TODO: use `git stash {create, store, apply, drop}`
         // TODO: Ensure no dirty files after stash.
         let files = self.dirty_files()?;
         let mut ret_stash: Stash = state;
