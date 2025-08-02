@@ -78,6 +78,9 @@ pub struct Cli {
 
     #[arg(skip)]
     metadata: Option<Metadata>,
+
+    /// Display the tasks that will be run.
+    display_tasks: bool,
 }
 
 impl Cli {
@@ -218,6 +221,10 @@ impl Cli {
 
     pub fn is_current_branch(&self) -> bool {
         self.git_branch().is_current()
+    }
+
+    pub fn display_tasks(&self) -> bool {
+        self.display_tasks
     }
 
     // /// Partition workspace members into those selected and those excluded.
