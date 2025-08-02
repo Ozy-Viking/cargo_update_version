@@ -22,7 +22,7 @@ pub use manifest::version_location::{VersionLocation, VersionType};
 pub use miette::Result;
 pub use packages::{Package, PackageError, PackageName, Packages};
 pub use process::{OutputExt, Process, ProcessOutput};
-pub use tasks::{Task, TaskError, Tasks};
+pub use tasks::{DisplayTasks, Task, TaskError, Tasks};
 pub use version::{Bumpable, Setable};
 
 use miette::{IntoDiagnostic, bail};

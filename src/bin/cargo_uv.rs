@@ -1,8 +1,8 @@
 use std::env::args;
 
 use cargo_uv::{
-    Action, Cargo, Cli, FOOTER, GitBuilder, Packages, Result, Stash, Task, Tasks, VersionType,
-    setup_tracing,
+    Action, Cargo, Cli, DisplayTasks, FOOTER, GitBuilder, Packages, Result, Stash, Task, Tasks,
+    VersionType, setup_tracing,
 };
 use clap::CommandFactory;
 use miette::{Context, IntoDiagnostic, ensure, miette};
@@ -22,6 +22,12 @@ fn main() -> Result<()> {
     let mut args = Cli::from_arg_matches(&cli.get_matches_from(&input)).into_diagnostic()?;
 
     setup_tracing(&args)?;
+
+    if args.display_tasks() {
+        DisplayTasks::new(&args).display()?;
+        return Ok(());
+    }
+
     let root_dir = args.root_dir()?;
     let git = GitBuilder::new().root_directory(root_dir).build();
 
@@ -202,7 +208,7 @@ fn main() -> Result<()> {
         }
     };
 
-    if let Some(Task::DeleteGitTag(version)) = tasks.delete_tag() {
+    if let Some(Task::DeleteGitTag(version)) = tasks.get_delete_tag() {
         let root_dir = args.root_dir()?;
         let git = GitBuilder::new().root_directory(root_dir).build();
         git.tag(&args, version, Some(vec!["--delete"]))?;

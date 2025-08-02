@@ -50,10 +50,14 @@ impl Tasks {
         self.completed.iter().cloned().collect()
     }
 
+    /// Adds the task to the Completed Hashset.
+    ///
+    /// Returns if the task is newly completed.
     pub fn complete_task(&mut self, task: &Task) -> bool {
         self.completed.insert(task.clone())
     }
 
+    /// Collects a filtered Vec of tasks that should have been completed before any clean up tasks.
     pub fn all_tasks_but_delete_tag(&self) -> Vec<Task> {
         self.tasks
             .keys()
@@ -61,6 +65,7 @@ impl Tasks {
             .cloned()
             .collect()
     }
+
     /// [bool] if remaining tasks exist based on [self.incomplete_tasks].
     pub fn remaining_tasks(&self) -> bool {
         !self.incomplete_tasks().is_empty()
@@ -70,6 +75,7 @@ impl Tasks {
         self.incomplete_tasks().len()
     }
 
+    /// Collects a [`Vec<Task>`] of tasks that change a version of a package/s.
     pub fn version_change_tasks(&self) -> Vec<Task> {
         self.tasks
             .keys()
@@ -78,7 +84,10 @@ impl Tasks {
             .collect()
     }
 
-    pub fn delete_tag(&self) -> Option<&Task> {
+    /// Gets the [`DeleteGitTag`] [Task] from the [Tasks].
+    ///
+    /// [`DeleteGitTag`]: Task::DeleteGitTag
+    pub fn get_delete_tag(&self) -> Option<&Task> {
         self.tasks.keys().find(|k| k.is_delete_git_tag())
     }
 }
@@ -124,6 +133,7 @@ impl AsMut<HashSet<Task>> for Tasks {
 impl Tasks {
     #[allow(clippy::result_large_err)]
     #[instrument(skip_all, fields(remaining_tasks), name = "Tasks::join_all")]
+    /// Joins all remaining [Task] with [Child] process.
     pub fn join_all(mut self) -> miette::Result<Tasks, TaskError> {
         tracing::debug!("Starting to join tasks: {}", self.remaining_tasks_left());
         let span = current_span!();

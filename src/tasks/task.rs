@@ -2,7 +2,7 @@ use std::{fmt::Display, process::Child};
 
 use semver::{BuildMetadata, Prerelease, Version};
 
-use crate::{Action, Package, ReadToml, Result};
+use crate::{Action, Cli, Package, Packages, ReadToml, Result};
 
 #[derive(Hash, PartialEq, Debug, Eq, Clone)]
 pub enum Task {
@@ -114,7 +114,37 @@ impl Task {
 }
 
 impl Task {
-    pub fn run(&mut self) -> Option<Child> {
-        None
+    pub fn run(&mut self, packages: Packages) -> Result<Option<Child>> {
+        // TODO: Run action
+        match self {
+            Task::Push(_) => todo!(),
+            Task::Publish => todo!(),
+            Task::Print => {
+                let root_version = packages.root_version()?;
+                println!("{}", root_version);
+                Ok(None)
+            }
+            Task::Tree => {
+                println!("{}", packages.display_tree());
+                Ok(None)
+            }
+            Task::Set { version, package } => todo!(),
+            Task::Bump {
+                package,
+                bump,
+                pre,
+                build,
+                force,
+            } => todo!(),
+            Task::BumpWorkspace {
+                bump,
+                pre,
+                build,
+                force,
+            } => todo!(),
+            Task::SetWorkspace { version } => todo!(),
+            Task::DeleteGitTag(version) => todo!(),
+            Task::ChangeBranch { to, from } => todo!(),
+        }
     }
 }

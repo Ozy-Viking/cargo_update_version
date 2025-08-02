@@ -1,5 +1,5 @@
 mod predict_tasks;
-// pub(crate) use predict_tasks;
+pub use predict_tasks::DisplayTasks;
 mod tasks;
 pub use tasks::Tasks;
 mod task;
