@@ -48,6 +48,15 @@ pub enum Branch {
     },
 }
 
+impl AsRef<str> for Branch {
+    fn as_ref(&self) -> &str {
+        match self {
+            Branch::Current => ".",
+            Branch::Other { local } => local,
+        }
+    }
+}
+
 impl Branch {
     /// Returns `true` if the branch is [`Current`].
     ///
