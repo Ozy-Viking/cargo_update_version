@@ -148,6 +148,7 @@ impl CargoFile<ReadToml> {
     #[track_caller]
     #[instrument(skip(self))]
     pub fn set_version(&mut self, new_version: Version) -> miette::Result<(), CargoFileError> {
+        tracing::warn!("set version start");
         let cargo_path = self.path().to_path_buf();
         let pack_err = VersionLocation::Package.set_version(self, &new_version);
         let ws_err = VersionLocation::WorkspacePackage.set_version(self, &new_version);
@@ -159,7 +160,8 @@ impl CargoFile<ReadToml> {
                 VerLocErrKind::PackageNotFound => (),
                 VerLocErrKind::NotFound(_) => (),
                 VerLocErrKind::WorkspaceNotFound => unreachable!("Setting package"),
-                VerLocErrKind::ItemInvalid(_) | VerLocErrKind::SemverError(_) => {
+                VerLocErrKind::ItemInvalid(_) => (), // Errors when both package.version.workspace = true
+                VerLocErrKind::SemverError(_) => {
                     return Err(
                         CargoFileErrorKind::LocationError(cargo_file_err).to_error(cargo_path)
                     );
@@ -168,6 +170,7 @@ impl CargoFile<ReadToml> {
         } else {
             return Ok(());
         };
+        tracing::warn!("set version: after Package");
 
         if let Some(ver_loc_error) = ws_err.err() {
             use crate::manifest::error::VersionLocationErrorKind as VerLocErrKind;

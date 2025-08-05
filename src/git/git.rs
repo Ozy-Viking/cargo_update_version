@@ -127,14 +127,12 @@ impl Git<PathBuf> {
     /// add 'Cargo.toml'
     /// add 'pack1/Cargo.toml'
     /// add 'pack2/Cargo.toml'
-    pub fn add_cargo_files(&self) -> miette::Result<()> {
+    pub fn add_files(&self, files: &Vec<PathBuf>) -> miette::Result<()> {
         let mut git = self.command(false);
-        let cargo_toml = "Cargo.toml";
-        let all_cargo_toml = "./**/Cargo.toml";
-        let cargo_lock = "Cargo.lock";
 
-        info!("Staging cargo files: {}, {}", cargo_toml, cargo_lock);
-        git.args(["add", "-v", cargo_toml, cargo_lock, all_cargo_toml]);
+        info!("Staging files: {:?}", files);
+        git.args(["add", "-v"]);
+        git.args(files);
         Process::Output.run(git).map(|_| ())
     }
 }
@@ -165,39 +163,34 @@ impl Git<PathBuf> {
     }
 
     #[instrument(skip_all)]
-    pub fn commit(&self, cli_args: &Cli, new_version: &Version) -> miette::Result<()> {
-        let mut git = self.command(cli_args.suppress.includes_git());
+    pub fn commit(&self, message: &str, suppress: Suppress, dry_run: bool) -> miette::Result<()> {
+        let mut git = self.command(suppress.includes_git());
         info!("Creating commit");
         git.args(["commit"]);
 
-        if cli_args.dry_run() {
+        if dry_run {
             git.arg("--dry-run");
         }
-        match cli_args.git_message() {
-            Some(msg) => {
-                git.args(["--message", &msg]);
-            }
-            None => {
-                git.args(["--message", &new_version.to_string()]);
-            }
-        }
 
-        let _stdout = match Process::Output.run(git)? {
-            ProcessOutput::Output(output) => output.stdout(),
-            _ => unreachable!(),
-        };
-        self.dirty_files().context("After Commit")?;
-        Ok(())
+        git.args(["--message", &message]);
+        let cmd = Process::display_command(&git);
+        let run = Process::Output.run(git)?;
+        let output = run.as_output().unwrap();
+        if output.status.success() {
+            Ok(())
+        } else {
+            miette::bail!("Failed to run `{cmd}`")
+        }
     }
 
     #[instrument(skip_all)]
     pub fn tag(
         &self,
-        cli_args: &Cli,
         version: &Version,
+        suppress: Suppress,
         args: Option<Vec<&str>>,
     ) -> miette::Result<()> {
-        let mut git = self.command(cli_args.suppress.includes_git());
+        let mut git = self.command(suppress.includes_git());
         git.arg("tag");
         if let Some(a) = args {
             git.args(a);
@@ -225,44 +218,25 @@ impl Git<PathBuf> {
     #[instrument(skip_all, fields(dry_run))]
     pub fn push(
         &self,
-        cli_args: &Cli,
-        version: &Version,
-    ) -> miette::Result<Vec<(Task, Option<Child>)>> {
-        current_span!().record("dry_run", cli_args.dry_run());
-        let tag_string = String::from("tags/") + &self.generate_tag(version);
-        let join = self
-            .remotes()?
-            .iter()
-            .map(|remote| {
-                let task = Task::GitPush {
-                    tag: tag_string.clone(),
-                    remote: remote.into(),
-                    #[cfg(feature = "unstable")]
-                    branch: Branch::Current, // TODO: Set to branch
-                };
-                info!("Pushing to remote: {remote}");
-                let mut git_push = self.command(cli_args.suppress.includes_git());
-                git_push.arg("push");
-                if cli_args.dry_run() {
-                    git_push.arg("--dry-run");
-                }
-                git_push.args([remote.as_str(), &tag_string, "--porcelain"]);
-                tracing::debug!("Running: {:?}", git_push);
-                let child = match Process::Spawn.run(git_push) {
-                    Ok(ProcessOutput::Child(child)) => Ok(child),
-                    Err(e) => Err(e),
-                    _ => unreachable!(),
-                };
-                (task, child)
-            })
-            .collect::<Vec<_>>();
-        let mut ret = vec![];
-
-        for (t, c) in join {
-            ret.push((t, Some(c?)));
+        tag: &str,
+        suppress: Suppress,
+        dry_run: bool,
+        remote: &str,
+    ) -> miette::Result<Child> {
+        current_span!().record("dry_run", dry_run);
+        let tag_string = String::from("tags/") + tag;
+        info!("Pushing to remote: {remote}");
+        let mut git_push = self.command(suppress.includes_git());
+        git_push.arg("push");
+        if dry_run {
+            git_push.arg("--dry-run");
         }
-
-        Ok(ret)
+        git_push.args([remote, &tag_string, "--porcelain"]);
+        match Process::Spawn.run(git_push) {
+            Ok(ProcessOutput::Child(child)) => Ok(child),
+            Err(e) => Err(e),
+            _ => unreachable!(),
+        }
     }
 
     /// Returns a list of remotes for the current branch.
@@ -355,14 +329,10 @@ impl Git<PathBuf> {
         })
     }
 
+    #[cfg(feature = "unstable")]
     #[allow(unreachable_code, unused_variables)]
-    #[instrument(skip_all, fields(from, to, stash_revert_required))]
-    pub fn checkout(
-        &self,
-        cli_args: &Cli,
-        branch: Branch,
-        stash_state: Stash,
-    ) -> Result<(Branch, Stash)> {
+    #[instrument(skip_all, fields(from, to, suppress))]
+    pub fn checkout(&self, branch: &Branch, suppress: Suppress) -> Result<Branch> {
         let current_branch = self.current_branch()?;
 
         let span = current_span!();
@@ -370,21 +340,21 @@ impl Git<PathBuf> {
         span.record("to", branch.as_ref());
 
         tracing::debug!("Switch to {:?}", current_branch);
-        unimplemented!("");
 
         // Check if need to stash.
         // #46
-        let mut revert_stash = Stash::Dont;
-        if stash_state.is_stash() {
-            revert_stash = self.stash(cli_args.suppress, stash_state)?;
-        }
+        // let mut revert_stash = Stash::Dont;
+        // if stash_state.is_stash() {
+        //     revert_stash = self.stash(cli_args.suppress, stash_state)?;
+        // }
 
         // Changing branch
-        let mut cmd = self.command(cli_args.suppress.includes_git());
+        let mut cmd = self.command(suppress.includes_git());
 
         if let Branch::Named { local } = &branch {
             cmd.args(["checkout", local.as_ref()]);
         } else {
+            tracing::warn!("No reason to change to current branch");
             bail!("Can't change branch to current branch.")
         };
 
@@ -398,18 +368,18 @@ impl Git<PathBuf> {
 
         if !output.status.success() {
             miette::bail!(
-                help = "Failed to run 'git branch --show-current'",
+                help = format!("Failed to run: git checkout {}", &branch),
                 "{}",
                 output.stderr()
             );
         }
 
-        // #46
-        if stash_state.is_unstash() {
-            revert_stash = self.stash(cli_args.suppress, stash_state)?;
-        }
+        // XXX: #46 move out of here and into own task.
+        // if stash_state.is_unstash() {
+        //     revert_stash = self.stash(cli_args.suppress, stash_state)?;
+        // }
 
-        Ok((current_branch, revert_stash))
+        Ok(current_branch)
     }
 
     pub fn stash(&self, suppress: Suppress, state: Stash) -> Result<Stash> {

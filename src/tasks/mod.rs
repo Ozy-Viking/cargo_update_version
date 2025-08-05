@@ -36,7 +36,7 @@ impl TaskError {
             output: output
                 .as_ref()
                 .map(|o| o.stderr())
-                .unwrap_or("Unknown Ourput".into()),
+                .unwrap_or("Unknown Output".into()),
             status_code: output.as_ref().map(|o| o.status),
             msg: msg.into(),
         }

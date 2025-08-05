@@ -29,15 +29,15 @@ impl Branch {
         matches!(self, Self::Current)
     }
 
-    /// Returns `true` if the branch is [`Other`].
+    /// Returns `true` if the branch is [`Named`].
     ///
-    /// [`Other`]: Branch::Other
+    /// [`Named`]: Branch::Named
     #[must_use]
-    pub fn is_other(&self) -> bool {
+    pub fn is_named(&self) -> bool {
         matches!(self, Self::Named { .. })
     }
 
-    pub fn as_other(&self) -> Option<&String> {
+    pub fn as_named(&self) -> Option<&String> {
         if let Self::Named { local } = self {
             Some(local)
         } else {
@@ -45,7 +45,7 @@ impl Branch {
         }
     }
 
-    pub fn try_into_other(self) -> Result<String, Self> {
+    pub fn try_into_named(self) -> Result<String, Self> {
         if let Self::Named { local } = self {
             Ok(local)
         } else {

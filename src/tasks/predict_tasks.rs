@@ -2,7 +2,7 @@ use std::{env::current_dir, fmt::Display, path::PathBuf};
 
 use miette::{IntoDiagnostic, ensure, miette};
 
-use crate::{Action, Bumpable, Cli, Packages, Result, Task, Tasks, VersionType};
+use crate::{Action, Bumpable, Cli, PackageName, Packages, Result, Task, Tasks, VersionType};
 #[cfg(feature = "unstable")]
 use crate::{Branch, Stash};
 pub trait Displayable {
@@ -152,30 +152,37 @@ impl<'a> Tasks {
                     force_version,
                 )?;
 
-                tasks.insert(task, None);
+                tasks.insert(task.clone(), None);
+                if !cli_args.dry_run() && task.is_version_change() {
+                    tasks.insert(Task::WriteCargoToml(package.name().clone()), None);
+                }
             }
         }
 
         if change_workspace_package_version {
-            let mut new_version = tasks.packages_mut().workspace_package_mut().ok_or(miette!(help = "Is expected either from '--workspace-package' or a package's version is 'version.workspace = true'","Expected a workspace package, none was found."))?.version_owned();
+            let workspace_package = tasks.packages_mut().workspace_package_mut().ok_or(miette::miette!("workspace.pa"))?;
+            let ws_name = workspace_package.name().clone();
+            let mut new_version = workspace_package.version_owned();
 
             let task = match cli_args.action() {
                 Action::Pre | Action::Patch | Action::Minor | Action::Major => {
                     new_version.bump(cli_args.action(), pre_release, build, force_version)?;
-                    Some(Task::BumpWorkspace {
+                    Task::BumpWorkspace {
                         bump: cli_args.action(),
                         new_version,
-                    })
+                    }
                 }
-                Action::Set => Some(Task::SetWorkspace {
+                Action::Set => Task::SetWorkspace {
                     new_version: cli_args.set_version.clone().ok_or(miette::miette!(
                         "Expected a new version for Task::from_action when action is Set"
                     ))?,
-                }),
-                Action::Print | Action::Tree => None,
+                },
+                Action::Print => Task::DisplayVersion(PackageName::workspace_package()),
+                Action::Tree => Task::WorkspaceTree,
             };
-            if let Some(t) = task {
-                tasks.insert(t, None);
+            tasks.insert(task.clone(), None);
+            if !cli_args.dry_run() && task.is_version_change() {
+                tasks.insert(Task::WriteCargoToml(ws_name), None);
             }
         }
 

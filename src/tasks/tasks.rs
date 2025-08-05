@@ -5,7 +5,7 @@ use indexmap::{IndexMap, IndexSet};
 use semver::Version;
 use tracing::{info, instrument};
 
-use crate::{Package, PackageError, Packages, ReadToml, Result, cli::Workspace, current_span};
+use crate::{Cli, Package, PackageError, Packages, ReadToml, Result, cli::Workspace, current_span};
 
 use super::{Task, TaskError};
 
@@ -61,11 +61,12 @@ impl Tasks {
         self.completed.insert(task.clone())
     }
 
-    /// Collects a filtered Vec of tasks that should have been completed before any clean up tasks.
-    pub fn all_tasks_but_delete_tag(&self) -> Vec<Task> {
+    /// Collects a filtered [`Vec<Task>`] that should be completed after
+    /// the main tasks using [Task::is_run_after_completed] method.
+    pub fn run_after_completed_tasks(&self) -> Vec<Task> {
         self.tasks
             .keys()
-            .filter(|&k| !k.is_delete_git_tag())
+            .filter(|&k| k.is_run_after_completed())
             .cloned()
             .collect()
     }
@@ -98,8 +99,12 @@ impl Tasks {
     pub fn tasks(&self) -> Vec<&Task> {
         self.tasks.keys().by_ref().collect()
     }
+    pub fn tasks_owned(&self) -> Vec<Task> {
+        self.tasks.keys().cloned().collect()
+    }
 
     #[allow(dead_code)]
+    #[cfg(feature = "unstable")]
     pub fn get_change_branch(&self) -> Option<&Task> {
         for task in self.tasks() {
             match task {
@@ -165,6 +170,38 @@ impl AsMut<IndexSet<Task>> for Tasks {
 }
 
 impl Tasks {
+    #[instrument(skip_all)]
+    pub fn run_all(mut self, cli_args: &Cli) -> Result<Self> {
+        tracing::debug!("Starting running tasks sequentially");
+        let git = cli_args.git()?;
+        let cargo = cli_args.cargo()?;
+        let task_list = self.tasks_owned();
+        let mut packages = self.packages.clone();
+
+        for task in task_list {
+            if task.is_run_after_completed() {
+                continue;
+            }
+            match task.run(cli_args, &mut packages, &git, &cargo) {
+                Ok(Some(c)) => {
+                    let child = self
+                        .get_mut(&task)
+                        .expect("task should be present in tasks");
+                    *child = Some(c)
+                }
+                Ok(None) => {
+                    self.complete_task(&task);
+                }
+                Err(e) => {
+                    tracing::error!("{task}, {e}");
+                    return Err(TaskError::from_tasks(self, task, None, e.to_string()))?;
+                }
+            }
+        }
+
+        Ok(self)
+    }
+
     #[allow(clippy::result_large_err)]
     #[instrument(skip_all, fields(remaining_tasks), name = "Tasks::join_all")]
     /// Joins all remaining [Task] with [Child] process.
@@ -226,10 +263,25 @@ impl Tasks {
 
         span.record("remaining_tasks", self.remaining_tasks_left());
         assert!(
-            self.all_tasks_but_delete_tag().len() == self.completed_tasks().len(),
+            self.run_after_completed_tasks().len() == self.incomplete_tasks().len(),
             "Tasks is not equal to completed tasks"
         );
         info!("All {} task/s complete!", self.completed_tasks().len());
+        Ok(self)
+    }
+
+    #[instrument(skip_all, fields(cleanup_tasks))]
+    pub fn run_cleanup_tasks(self, cli_args: &Cli) -> Result<Self> {
+        tracing::debug!("Starting running cleanup tasks");
+        let git = cli_args.git()?;
+        let cargo = cli_args.cargo()?;
+        let task_list = self.run_after_completed_tasks();
+        current_span!().record("cleanup_tasks", format!("{:?}", &task_list));
+        tracing::trace!("cleanup tasks");
+        let mut packages = self.packages.clone();
+        for task in task_list {
+            task.run(cli_args, &mut packages, &git, &cargo)?;
+        }
         Ok(self)
     }
 }
@@ -270,7 +322,6 @@ impl Tasks {
     pub fn root_version(&self) -> Result<Version> {
         let packages_root_version = self.packages.root_version()?;
         let version_tasks = self.version_change_tasks();
-        let workspace_package_version = self.packages.workspace_package();
         let root_package = self.packages.get_root_package();
 
         let root_package_name = root_package.map(|p| p.name().clone()).unwrap_or_default();
@@ -291,9 +342,7 @@ impl Tasks {
                     versions.insert((3, new_version));
                 }
                 Task::SetWorkspace { new_version } => {
-                    if workspace_package_version.is_some() {
-                        versions.insert((2, new_version));
-                    }
+                    versions.insert((2, new_version));
                 }
                 Task::Bump {
                     package_name,
@@ -306,9 +355,7 @@ impl Tasks {
                     versions.insert((3, new_version));
                 }
                 Task::BumpWorkspace { new_version, .. } => {
-                    if workspace_package_version.is_some() {
-                        versions.insert((2, new_version));
-                    }
+                    versions.insert((2, new_version));
                 }
                 _ => unreachable!(),
             }
@@ -333,11 +380,12 @@ impl Tasks {
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
 
     use super::*;
 
-    use crate::{Action, Branch, Bumpable, Cli, Packages};
+    #[cfg(feature = "unstable")]
+    use crate::Branch;
+    use crate::{Action, Bumpable, Cli, Packages};
 
     static TEST_BIN_NAME: &str = "cargo-uv";
 
@@ -373,6 +421,7 @@ mod tests {
             },
             Task::GitPush {
                 remote: "origin".into(),
+                #[cfg(feature = "unstable")]
                 branch: Branch::from_str("main").unwrap(),
                 tag: package.version().to_string(),
             },

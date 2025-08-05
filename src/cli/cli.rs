@@ -270,6 +270,10 @@ impl Cli {
         self.set_version.clone()
     }
 
+    pub fn suppress(&self) -> Suppress {
+        self.suppress
+    }
+
     // /// Partition workspace members into those selected and those excluded.
     // ///
     // /// Notes:

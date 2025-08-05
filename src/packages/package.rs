@@ -168,7 +168,7 @@ impl Package<ReadToml> {
         let version = VersionLocation::WorkspacePackage.get_version(&cargo_file)?;
 
         Ok(Package {
-            name: PackageName("workspace.package".into()),
+            name: PackageName::workspace_package(),
             version_type: VersionType::WorkspacePackage,
             version,
             manifest_path: manifest_path.into(),

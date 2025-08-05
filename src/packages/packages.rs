@@ -7,11 +7,12 @@ use std::{
 
 use cargo_metadata::Metadata;
 use indexmap::IndexSet;
+use miette::Context;
 use semver::Version;
 use tracing::{debug, instrument};
 
 use super::{Package, PackageError, PackageName};
-use crate::{ReadToml, Result, VersionLocation, display_path};
+use crate::{ReadToml, Result, VersionLocation, VersionLocationErrorKind, display_path};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Packages {
@@ -20,6 +21,7 @@ pub struct Packages {
     root_cargo_lock: PathBuf,
 
     /// Root package of the rust project.
+    /// BUG: #49 When both root_package and workspace_package they overwrite the root_manifest
     root_package: Option<PackageName>,
 
     /// The root package version or if not present the workplace version.
@@ -31,7 +33,7 @@ pub struct Packages {
     /// Hashmap of the packages in the rust project.
     packages: HashMap<PackageName, Package<ReadToml>>,
 
-    /// The package of the root Cargo.toml
+    /// The workspace.package of the root Cargo.toml
     workspace_package: Option<Package<ReadToml>>,
 }
 
@@ -163,7 +165,11 @@ impl Packages {
 
     /// Uses the [HashMap::get] and returns a ref to the [Package] if it exists.
     pub fn get_package(&self, package_name: &PackageName) -> Option<&Package<ReadToml>> {
-        self.packages.get(package_name)
+        if package_name.is_workspace_package() {
+            self.get_root_package()
+        } else {
+            self.packages.get(package_name)
+        }
     }
 
     ///  Uses the [HashMap::get_mut] and returns a mut ref to the [Package] if it exists.
@@ -171,7 +177,11 @@ impl Packages {
         &mut self,
         package_name: &PackageName,
     ) -> Option<&mut Package<ReadToml>> {
-        self.packages.get_mut(package_name)
+        if package_name.is_workspace_package() {
+            self.workspace_package_mut()
+        } else {
+            self.packages.get_mut(package_name)
+        }
     }
 
     ///  Uses the [HashMap::get] followed by [Option::cloned] and returns [Package] if it exists.
@@ -221,23 +231,20 @@ impl Packages {
             };
         };
 
-        if let Some(workspace_package) = &self.workspace_package {
+        if let Some(workspace_package) = self.workspace_package.as_ref() {
             // Checking the workspace package
             match VersionLocation::WorkspacePackage.get_version(workspace_package.cargo_file()) {
                 Ok(v) => return Ok(v),
                 Err(e) => match e.kind() {
-                    crate::VersionLocationErrorKind::SetByWorkspace => (),
+                    crate::VersionLocationErrorKind::SetByWorkspace => unreachable!(),
                     crate::VersionLocationErrorKind::NotFound(_) => (),
                     crate::VersionLocationErrorKind::PackageNotFound => unreachable!(),
-                    crate::VersionLocationErrorKind::WorkspaceNotFound => {
-                        todo!("Workspace Not Found")
-                    }
+                    crate::VersionLocationErrorKind::WorkspaceNotFound => (),
                     crate::VersionLocationErrorKind::ItemInvalid(_) => (),
                     crate::VersionLocationErrorKind::SemverError(_) => (),
                 },
             };
         }
-
         let mut versions = IndexSet::new();
         for ver in self.packages().values().map(|p| p.version()) {
             versions.insert(ver);
@@ -369,5 +376,56 @@ impl From<&Metadata> for Packages {
             default_members,
         )
         .expect("From cargo metadata")
+    }
+}
+
+/// Methods used by [`Task::run`]
+///
+/// [`Task::run`]: crate::Task::run
+impl Packages {
+    /// Used by both [`Task::Bump`] and [`Task::Set`].
+    ///
+    /// [`Task::Bump`]: crate::Task::Bump
+    /// [`Task::Set`]: crate::Task::Set
+    #[instrument(skip(self))]
+    pub fn set_package_version(
+        &mut self,
+        package_name: &PackageName,
+        new_version: Version,
+    ) -> Result<Version> {
+        tracing::trace!("Setting package version.");
+        let package = self
+            .get_package_mut(package_name)
+            .ok_or(miette::miette!("No package by name: {package_name}"))?;
+        package.set_version(new_version)
+    }
+
+    /// Used by both [`Task::BumpWorkspace`] and [`Task::SetWorkspace`].
+    ///
+    /// [`Task::BumpWorkspace`]: crate::Task::BumpWorkspace
+    /// [`Task::SetWorkspace`]: crate::Task::SetWorkspace
+    #[instrument(skip(self))]
+    pub fn set_workspace_package_version(&mut self, new_version: Version) -> Result<Version> {
+        tracing::trace!("Setting workspace package version.");
+        let package = self.workspace_package_mut().ok_or(miette::miette!(
+            "Expected 'workspace.package.version' to exist."
+        ))?;
+        package
+            .set_version(new_version)
+            .context("setting workspace.package version")
+    }
+
+    /// Used by [`Task::WriteCargoToml`]
+    ///
+    /// [`Task::WriteCargoToml`]: crate::Task::WriteCargoToml
+    #[instrument(skip(self))]
+    pub fn write_cargo_file(&mut self, package_name: &PackageName) -> Result<()> {
+        let package = self
+            .get_package_mut(package_name)
+            .ok_or(miette::miette!("No package by name: {package_name}"))?;
+
+        let version = package.write_cargo_file()?;
+        tracing::info!("Written '{version}' to {package_name}");
+        Ok(())
     }
 }
