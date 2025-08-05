@@ -2,11 +2,20 @@ use std::{env::current_dir, fmt::Display, path::PathBuf};
 
 use miette::{IntoDiagnostic, ensure, miette};
 
-use crate::{Action, Branch, Bumpable, Cli, Packages, Result, Stash, Task, Tasks, VersionType};
+use crate::{Action, Bumpable, Cli, Packages, Result, Task, Tasks, VersionType};
+#[cfg(feature = "unstable")]
+use crate::{Branch, Stash};
+pub trait Displayable {
+    const LAST_ITEM_PREFIX: &str = "└─ ";
+    const ITEM_PREFIX: &str = "├─ ";
+    const EXTRA_LINE_PREFIX: &str = "│  ";
+}
 
 pub struct DisplayTasks<'a> {
     tasks: &'a Tasks,
 }
+
+impl Displayable for DisplayTasks<'_> {}
 
 impl<'a> DisplayTasks<'a> {
     pub fn new(tasks: &'a Tasks) -> Self {
@@ -19,11 +28,29 @@ impl<'a> DisplayTasks<'a> {
     }
 
     fn task_item_string(&self, idx: usize, task: &'a Task) -> String {
-        format!("├─ {idx}. {task}\n")
+        let task_string = format!("{idx}. {task}\n");
+        let mut ret = task_string.lines();
+        let first_line = ret.next().expect("At least 1 line");
+        let mut rem_lines = vec![String::from(DisplayTasks::ITEM_PREFIX) + first_line];
+        for line in ret {
+            let l = String::from(DisplayTasks::EXTRA_LINE_PREFIX) + line;
+            rem_lines.push(l);
+        }
+
+        rem_lines.join("\n") + "\n"
     }
 
     fn task_item_string_last(&self, idx: usize, task: &'a Task) -> String {
-        format!("└─ {idx}. {task}\n")
+        let task_string = format!("{idx}. {task}\n");
+        let mut ret = task_string.lines();
+        let first_line = ret.next().expect("At least 1 line");
+        let mut rem_lines = vec![String::from(DisplayTasks::LAST_ITEM_PREFIX) + first_line];
+        for line in ret {
+            let l = String::from(DisplayTasks::EXTRA_LINE_PREFIX) + line;
+            rem_lines.push(l);
+        }
+
+        rem_lines.join("\n") + "\n" + "\n"
     }
 
     pub fn tasks(&self) -> Vec<&Task> {
@@ -69,8 +96,10 @@ impl<'a> Tasks {
         let force_version = cli_args.force_version();
 
         let current_branch = git.current_branch()?;
+        #[cfg(feature = "unstable")]
         let mut git_stash = None;
 
+        #[cfg(feature = "unstable")]
         let change_branch = if let Branch::Named { local } = cli_args.git_branch() {
             if !git_files.is_empty() {
                 let git_stash_task = Task::GitStash {
@@ -169,6 +198,7 @@ impl<'a> Tasks {
                     tasks.insert(
                         Task::GitPush {
                             remote: remote,
+                            #[cfg(feature = "unstable")]
                             branch: cli_args.git_branch(),
                             tag: new_version.to_string(),
                         },
@@ -188,10 +218,12 @@ impl<'a> Tasks {
         }
 
         // Last
+        #[cfg(feature = "unstable")]
         if let Some(Task::GitSwitchBranch { to, from }) = change_branch {
             tasks.insert(Task::GitSwitchBranch { to: from, from: to }, None);
         }
 
+        #[cfg(feature = "unstable")]
         if let Some(Task::GitStash {
             branch,
             stash: state,

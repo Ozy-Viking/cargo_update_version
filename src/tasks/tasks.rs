@@ -2,11 +2,10 @@ use std::process::Child;
 
 use indexmap::{IndexMap, IndexSet};
 
-use miette::{Result, miette};
 use semver::Version;
 use tracing::{info, instrument};
 
-use crate::{Package, PackageError, Packages, ReadToml, cli::Workspace, current_span};
+use crate::{Package, PackageError, Packages, ReadToml, Result, cli::Workspace, current_span};
 
 use super::{Task, TaskError};
 

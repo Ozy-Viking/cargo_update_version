@@ -10,7 +10,7 @@ repository = "https://github.com/Ozy-Viking/cargo_update_version"
 categories = ["command-line-utilities", "development-tools::cargo-plugins"]
 
 [dependencies]
-clap = { version = "4.5.40", features = ["derive", "cargo", "string"] }
+clap = { version = "4.5.42", features = ["derive", "cargo", "string"] }
 clap-verbosity-flag = { version = "3.0.3", features = [
     "tracing",
 ], default-features = false }
@@ -18,7 +18,7 @@ clap-cargo = { version = "0.16.0", features = ["cargo_metadata"] }
 cargo_metadata = { version = "0.21.0" }
 colorchoice-clap = "1.0.7"
 rusty_viking = "0.3.1"
-toml_edit = "0.23"
+toml_edit = "0.23.3"
 
 miette = { version = "7.6.0", features = ["fancy"] }
 semver = "1.0.26"
@@ -26,6 +26,10 @@ tracing = { version = "0.1.41" }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 thiserror = { version = "2" }
 indexmap = "2.10.0"
+
+[features]
+default = []
+unstable = []
 
 
 [[bin]]

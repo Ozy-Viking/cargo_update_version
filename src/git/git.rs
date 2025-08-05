@@ -237,6 +237,7 @@ impl Git<PathBuf> {
                 let task = Task::GitPush {
                     tag: tag_string.clone(),
                     remote: remote.into(),
+                    #[cfg(feature = "unstable")]
                     branch: Branch::Current, // TODO: Set to branch
                 };
                 info!("Pushing to remote: {remote}");

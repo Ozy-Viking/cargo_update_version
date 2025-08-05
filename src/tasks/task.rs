@@ -1,6 +1,5 @@
 use std::{fmt::Display, path::PathBuf, process::Child};
 
-use miette::bail;
 use semver::{BuildMetadata, Prerelease, Version};
 use tracing::instrument;
 
@@ -39,6 +38,8 @@ pub enum Task {
     GitCommit,
     GitPush {
         remote: String,
+
+        #[cfg(feature = "unstable")]
         branch: Branch,
         tag: String,
     },
@@ -81,11 +82,15 @@ impl Display for Task {
                 branch,
                 stash: state,
             } => &format!("Git Stash: {state:?} files on {}", branch),
+            #[cfg(feature = "unstable")]
             Task::GitPush {
                 remote,
                 branch,
                 tag,
             } => &format!("Git Push: {tag} to {remote} on {branch}"),
+
+            #[cfg(not(feature = "unstable"))]
+            Task::GitPush { remote, tag } => &format!("Git Push: {tag} to {remote}"),
             Task::GitCommit => "Git Commit",
             Task::GitTag(version) => &format!("Git Tag: {}", version),
             Task::DeleteGitTag(version) => &format!("Delete Git Tag: {}", version.to_string()),

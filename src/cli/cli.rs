@@ -1,7 +1,10 @@
 use std::{ops::Deref, path::PathBuf};
 
+#[cfg(feature = "unstable")]
+use crate::Branch;
+use crate::current_span;
 use crate::{
-    Action, Branch, Cargo, Git, GitBuilder, Result,
+    Action, Cargo, Git, GitBuilder, Result,
     cli::{CARGO_HEADER, GitOps, Manifest, Suppress, Workspace},
 };
 use cargo_metadata::Metadata;
@@ -9,8 +12,6 @@ use clap::{CommandFactory, FromArgMatches};
 use miette::IntoDiagnostic;
 use semver::Version;
 use tracing::{Level, debug, instrument};
-
-use crate::current_span;
 // use clap::ValueHint;
 
 pub const CLAP_STYLING: clap::builder::styling::Styles = clap::builder::styling::Styles::styled()
@@ -217,10 +218,12 @@ impl Cli {
         self.no_verify
     }
 
+    #[cfg(feature = "unstable")]
     pub fn git_branch(&self) -> Branch {
         self.git_ops.branch()
     }
 
+    #[cfg(feature = "unstable")]
     pub fn is_current_branch(&self) -> bool {
         self.git_branch().is_current()
     }

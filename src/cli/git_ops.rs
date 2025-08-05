@@ -1,5 +1,6 @@
-use crate::{cli::GIT_HEADER, git::Branch};
-
+#[cfg(feature = "unstable")]
+use crate::Branch;
+use crate::cli::GIT_HEADER;
 #[derive(Debug, clap::Args)]
 pub struct GitOps {
     #[arg(
@@ -25,11 +26,13 @@ pub struct GitOps {
         help_heading = GIT_HEADER)]
     pub force: bool,
 
+    #[cfg(feature = "unstable")]
     /// Used to change branch for the execution of the program. Defaults to current branch.
     #[arg(long, default_value = Branch::default(), hide_default_value(true), help_heading = GIT_HEADER)]
     branch: Branch,
 }
 
+#[cfg(feature = "unstable")]
 impl GitOps {
     pub fn branch(&self) -> Branch {
         self.branch.clone()
