@@ -9,6 +9,10 @@ use crate::{Cli, Package, PackageError, Packages, ReadToml, Result, cli::Workspa
 
 use super::{Task, TaskError};
 
+#[allow(unused_imports)]
+#[cfg(feature = "unstable")]
+use std::str::FromStr;
+
 #[derive(Debug)]
 pub struct Tasks {
     tasks: IndexMap<Task, Option<Child>>,
