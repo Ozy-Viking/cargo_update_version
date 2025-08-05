@@ -47,6 +47,13 @@ impl<CargoFileState> Package<CargoFileState> {
     pub fn manifest_path(&self) -> &PathBuf {
         &self.manifest_path
     }
+    pub fn manifest_path_mut(&mut self) -> &mut PathBuf {
+        &mut self.manifest_path
+    }
+
+    pub fn manifest_path_owned(&self) -> PathBuf {
+        self.manifest_path.clone()
+    }
 
     pub fn cargo_file(&self) -> &CargoFile<CargoFileState> {
         &self.cargo_file
@@ -58,6 +65,10 @@ impl<CargoFileState> Package<CargoFileState> {
 
     pub fn version_type(&self) -> VersionType {
         self.version_type
+    }
+
+    pub fn version_owned(&self) -> Version {
+        self.version.clone()
     }
 }
 
@@ -75,6 +86,7 @@ impl From<cargo_metadata::Package> for Package<ReadToml> {
         }
     }
 }
+
 impl Package<ReadToml> {
     #[instrument(skip_all)]
     pub fn set_version_type(cargo_file: &CargoFile<ReadToml>) -> Result<VersionType> {
@@ -113,8 +125,8 @@ impl Package<ReadToml> {
     pub fn bump_version(
         &mut self,
         action: Action,
-        pre: Option<Prerelease>,
-        build: Option<BuildMetadata>,
+        pre: Option<&Prerelease>,
+        build: Option<&BuildMetadata>,
         force: bool,
     ) -> Result<Version> {
         let span = current_span!();

@@ -1,58 +1,95 @@
-use std::{fmt::Display, process::Child};
+use std::{fmt::Display, path::PathBuf, process::Child};
 
+use miette::bail;
 use semver::{BuildMetadata, Prerelease, Version};
 use tracing::instrument;
 
-use crate::{Action, Cli, Package, Packages, ReadToml, Result};
+use crate::{Action, Branch, Bumpable, Package, PackageName, Packages, ReadToml, Result, Stash};
 
 #[derive(Hash, PartialEq, Debug, Eq, Clone)]
 pub enum Task {
-    Push(String),
-    Publish,
-    Print,
-    Tree,
+    // Display
+    DisplayVersion(PackageName),
+    WorkspaceTree,
+
+    // Version adjustment
     Set {
-        version: Version,
-        package: Package<ReadToml>,
+        package_name: PackageName,
+        new_version: Version,
+    },
+    SetWorkspace {
+        new_version: Version,
     },
     Bump {
-        package: Package<ReadToml>,
+        package_name: PackageName,
         bump: Action,
-        pre: Option<Prerelease>,
-        build: Option<BuildMetadata>,
-        force: bool,
+        new_version: Version,
     },
     BumpWorkspace {
         bump: Action,
-        pre: Option<Prerelease>,
-        build: Option<BuildMetadata>,
-        force: bool,
+        new_version: Version,
     },
-    SetWorkspace {
-        version: Version,
+
+    // Git
+    GitStash {
+        branch: Branch,
+        stash: Stash,
     },
+    GitAdd(Vec<PathBuf>),
+    GitCommit,
+    GitPush {
+        remote: String,
+        branch: Branch,
+        tag: String,
+    },
+    GitSwitchBranch {
+        to: Branch,
+        from: Branch,
+    },
+    GitTag(Version),
     DeleteGitTag(Version),
-    ChangeBranch {
-        to: String,
-        from: String,
-    },
+
+    // Cargo
+    WriteCargoToml(PackageName),
+    CargoPublish,
+    CargoGenerateLock,
 }
 
 impl Display for Task {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let text = match self {
-            Task::Push(remote) => &format!("Push to {remote}"),
-            Task::Publish => "Publish",
-            Task::Print => "Print",
-            Task::Tree => "Tree",
-            Task::Set { version, package } => {
-                &format!("Set {}: {}", package.name(), version.to_string())
-            }
-            Task::Bump { package, bump, .. } => &format!("Bump {bump}: {}", package.name()),
+            Task::DisplayVersion(package) => &format!("Print Version: {}", package),
+            Task::WorkspaceTree => "Display Workspace Tree",
+            Task::Bump {
+                package_name: package,
+                bump,
+                new_version,
+            } => &format!("Bump {bump}: {} -> {new_version}", package),
             Task::BumpWorkspace { bump, .. } => &format!("Bump Workspace Package: {}", bump),
-            Task::SetWorkspace { version } => &format!("Set Workspace: {}", version.to_string()),
+            Task::Set {
+                new_version,
+                package_name: package,
+            } => &format!("Set {}: {}", package, new_version),
+            Task::SetWorkspace {
+                new_version: version,
+            } => &format!("Set Workspace: {}", version.to_string()),
+            Task::CargoPublish => "Cargo Publish",
+            Task::WriteCargoToml(package) => &format!("Write Cargo.toml for: {}", package),
+            Task::GitSwitchBranch { to, .. } => &format!("Change branch: {}", to),
+            Task::GitAdd(paths) => &format!("Git Add: {:#?}", paths),
+            Task::GitStash {
+                branch,
+                stash: state,
+            } => &format!("Git Stash: {state:?} files on {}", branch),
+            Task::GitPush {
+                remote,
+                branch,
+                tag,
+            } => &format!("Git Push: {tag} to {remote} on {branch}"),
+            Task::GitCommit => "Git Commit",
+            Task::GitTag(version) => &format!("Git Tag: {}", version),
             Task::DeleteGitTag(version) => &format!("Delete Git Tag: {}", version.to_string()),
-            Task::ChangeBranch { to, .. } => &format!("Change branch: {}", to),
+            Task::CargoGenerateLock => "Cargo Generate Lockfile",
         };
         write!(f, "{}", text)
     }
@@ -61,17 +98,11 @@ impl Display for Task {
 impl Task {
     pub fn is_version_change(&self) -> bool {
         match self {
-            Task::ChangeBranch { .. }
-            | Task::Push(_)
-            | Task::Publish
-            | Task::Print
-            | Task::DeleteGitTag(_)
-            | Task::Tree => false,
-
             Task::Set { .. }
             | Task::Bump { .. }
             | Task::BumpWorkspace { .. }
             | Task::SetWorkspace { .. } => true,
+            _ => false,
         }
     }
 
@@ -82,34 +113,52 @@ impl Task {
     pub fn is_delete_git_tag(&self) -> bool {
         matches!(self, Self::DeleteGitTag(..))
     }
+
+    /// Returns `true` if the task is [`ChangeBranch`].
+    ///
+    /// [`ChangeBranch`]: Task::ChangeBranch
+    #[must_use]
+    pub fn is_change_branch(&self) -> bool {
+        matches!(self, Self::GitSwitchBranch { .. })
+    }
+
+    /// Returns `true` if the task is [`Print`].
+    ///
+    /// [`Print`]: Task::Print
+    #[must_use]
+    pub fn is_print(&self) -> bool {
+        matches!(self, Self::DisplayVersion(..))
+    }
 }
 
 /// TODO: Make a reference.
-impl Task {
+impl<'a> Task {
     pub fn from_action(
         action: Action,
-        package: Package<ReadToml>,
-        pre: Option<Prerelease>,
-        build: Option<BuildMetadata>,
-        new_version: Option<Version>,
-        force: bool,
+        package: &'a Package<ReadToml>,
+        set_version: Option<Version>,
+        pre_release: Option<&Prerelease>,
+        build: Option<&BuildMetadata>,
+        force_version: bool,
     ) -> Result<Task> {
         match action {
-            Action::Pre | Action::Patch | Action::Minor | Action::Major => Ok(Task::Bump {
-                package: package,
-                bump: action,
-                pre,
-                build,
-                force,
-            }),
+            Action::Pre | Action::Patch | Action::Minor | Action::Major => {
+                let mut new_version = package.version_owned();
+                new_version.bump(action, pre_release, build, force_version)?;
+                Ok(Task::Bump {
+                    package_name: package.name().clone(),
+                    bump: action,
+                    new_version,
+                })
+            }
             Action::Set => Ok(Task::Set {
-                version: new_version.ok_or(miette::miette!(
-                    "Expected a new version for Task::from_action when action is Set"
+                new_version: set_version.ok_or(miette::miette!(
+                    "Expected a version for Task::from_action when the action is `Set`"
                 ))?,
-                package,
+                package_name: package.name().clone(),
             }),
-            Action::Print => Ok(Task::Tree),
-            Action::Tree => Ok(Task::Print),
+            Action::Tree => Ok(Task::WorkspaceTree),
+            Action::Print => Ok(Task::DisplayVersion(package.name().clone())),
         }
     }
 }
@@ -121,34 +170,31 @@ impl Task {
     pub fn run(&mut self, packages: Packages) -> Result<Option<Child>> {
         tracing::debug!("Starting task: {}", self);
         let ret = match self {
-            Task::Push(_) => todo!(),
-            Task::Publish => todo!(),
-            Task::Print => {
-                let root_version = packages.root_version()?;
-                println!("{}", root_version);
+            Task::GitPush { .. } => todo!(),
+            Task::CargoPublish => todo!(),
+            Task::DisplayVersion(package_name) => {
+                let package = packages
+                    .get_package(package_name)
+                    .ok_or(miette::miette!("No package with name {}", package_name))?;
+                println!("{}: {}", package_name, package.version());
                 Ok(None)
             }
-            Task::Tree => {
+            Task::WorkspaceTree => {
                 println!("{}", packages.display_tree());
                 Ok(None)
             }
-            Task::Set { version, package } => todo!(),
-            Task::Bump {
-                package,
-                bump,
-                pre,
-                build,
-                force,
-            } => todo!(),
-            Task::BumpWorkspace {
-                bump,
-                pre,
-                build,
-                force,
-            } => todo!(),
-            Task::SetWorkspace { version } => todo!(),
-            Task::DeleteGitTag(version) => todo!(),
-            Task::ChangeBranch { to, from } => todo!(),
+            Task::Set { .. } => todo!(),
+            Task::Bump { .. } => todo!(),
+            Task::BumpWorkspace { .. } => todo!(),
+            Task::SetWorkspace { .. } => todo!(),
+            Task::DeleteGitTag(_) => todo!(),
+            Task::GitSwitchBranch { .. } => todo!(),
+            Task::WriteCargoToml(_) => todo!(),
+            Task::GitStash { .. } => todo!(),
+            Task::GitAdd(_) => todo!(),
+            Task::GitCommit => todo!(),
+            Task::GitTag(_) => todo!(),
+            Task::CargoGenerateLock => todo!(),
         };
         tracing::trace!("Finishing task: {} with status Ok:{}", self, ret.is_ok());
         ret

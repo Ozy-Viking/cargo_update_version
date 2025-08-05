@@ -11,8 +11,8 @@ pub(crate) mod tasks;
 pub(crate) mod version;
 
 pub use cargo::Cargo;
-pub use cli::{Action, Branch, Cli};
-pub use git::{Git, GitBuilder, GitFile, GitFiles, NoRootDirSet, Stash};
+pub use cli::{Action, Cli};
+pub use git::{Branch, Git, GitBuilder, GitFile, GitFiles, NoRootDirSet, Stash};
 pub use manifest::error::{
     CargoFileError, CargoFileErrorKind, ItemType, VersionLocationErrorKind, VersionlocationError,
 };
@@ -26,7 +26,7 @@ pub use tasks::{DisplayTasks, Task, TaskError, Tasks};
 pub use version::{Bumpable, Setable};
 
 use miette::{IntoDiagnostic, bail};
-use tracing::Level;
+use tracing::{Level, info};
 use tracing_subscriber::util::SubscriberInitExt;
 
 /// Footer for the [miette::MietteHandler]
@@ -57,6 +57,7 @@ pub fn setup_tracing(args: &Cli) -> miette::Result<()> {
         builder = builder.with_line_number(true).with_file(true)
     }
     builder.finish().try_init().into_diagnostic()?;
+    info!("Tracing level: {}", app_level);
     Ok(())
 }
 
@@ -71,5 +72,15 @@ macro_rules! current_span {
 macro_rules! display_path {
     ($path:ident) => {
         $path.as_os_str().display()
+    };
+}
+
+#[macro_export]
+macro_rules! exit {
+    () => {
+        std::process::exit(0)
+    };
+    ($code:literal) => {
+        std::process::exit($code)
     };
 }

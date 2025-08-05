@@ -1,10 +1,11 @@
 use std::{
-    fmt::Debug,
+    fmt::{Debug, Display},
     path::{Path, PathBuf},
     process::{Child, Command, Stdio},
     str::FromStr,
 };
 
+use indexmap::IndexSet;
 use miette::{Context, bail};
 use semver::Version;
 use tracing::{debug, info, instrument, warn};
@@ -139,13 +140,19 @@ impl Git<PathBuf> {
 }
 
 impl Git<PathBuf> {
-    /// Generates a list of dirty files.
+    /// Generates a [GitFiles] of dirty files. Only errors if the command errors.
     #[instrument(skip_all)]
     pub fn dirty_files(&self) -> miette::Result<GitFiles> {
         let mut git = self.command(true);
         git.args(["status", "--short"]);
         let stdout = match Process::Output.run(git)? {
-            ProcessOutput::Output(output) => output.stdout(),
+            ProcessOutput::Output(output) => {
+                if output.status.success() {
+                    output.stdout()
+                } else {
+                    bail!("'git status --short' failed")
+                }
+            }
             _ => unreachable!(),
         };
         if stdout.lines().count() == 0 {
@@ -208,22 +215,30 @@ impl Git<PathBuf> {
     }
 
     #[instrument(skip_all)]
-    pub fn generate_tag(&self, version: &Version) -> String {
+    pub fn generate_tag(&self, version: impl Display) -> String {
         let tag = version.to_string();
-        debug! {"Tag: {tag}", };
+        debug! {"Tag: {tag}"};
         tag
     }
 
     /// Pushed just the tag to the remotes
     #[instrument(skip_all, fields(dry_run))]
-    pub fn push(&self, cli_args: &Cli, version: &Version) -> miette::Result<Vec<(Task, Child)>> {
+    pub fn push(
+        &self,
+        cli_args: &Cli,
+        version: &Version,
+    ) -> miette::Result<Vec<(Task, Option<Child>)>> {
         current_span!().record("dry_run", cli_args.dry_run());
         let tag_string = String::from("tags/") + &self.generate_tag(version);
         let join = self
             .remotes()?
             .iter()
             .map(|remote| {
-                let task = Task::Push(remote.clone());
+                let task = Task::GitPush {
+                    tag: tag_string.clone(),
+                    remote: remote.into(),
+                    branch: Branch::Current, // TODO: Set to branch
+                };
                 info!("Pushing to remote: {remote}");
                 let mut git_push = self.command(cli_args.suppress.includes_git());
                 git_push.arg("push");
@@ -243,7 +258,7 @@ impl Git<PathBuf> {
         let mut ret = vec![];
 
         for (t, c) in join {
-            ret.push((t, c?));
+            ret.push((t, Some(c?)));
         }
 
         Ok(ret)
@@ -264,7 +279,7 @@ impl Git<PathBuf> {
 
         let remotes: Vec<String> = stdout.lines().map(String::from).collect();
 
-        let mut branch_remotes = Vec::new();
+        let mut branch_remotes = IndexSet::new();
 
         for line in self.branch(vec!["--remotes"])?.lines() {
             let valid_remote = match line.split_once('/') {
@@ -279,7 +294,7 @@ impl Git<PathBuf> {
             };
             assert!(remotes.contains(&valid_remote));
 
-            branch_remotes.push(valid_remote);
+            branch_remotes.insert(valid_remote);
         }
         info!("Remotes: {:?}", branch_remotes);
 
@@ -289,7 +304,7 @@ impl Git<PathBuf> {
             warn!("Ensure you only run command on a branch with a remote.");
             bail!("Failed to find remote for current branch.")
         }
-        Ok(branch_remotes)
+        Ok(branch_remotes.into_iter().collect())
     }
 
     /// Runs `git branch` with any additional arguments.
@@ -334,10 +349,12 @@ impl Git<PathBuf> {
             },
             Err(e) => Err(e.wrap_err("Failed to run 'git branch --show-current'"))?,
         };
-        Ok(Branch::Other {
+        Ok(Branch::Named {
             local: current_branch,
         })
     }
+
+    #[allow(unreachable_code, unused_variables)]
     #[instrument(skip_all, fields(from, to, stash_revert_required))]
     pub fn checkout(
         &self,
@@ -351,19 +368,20 @@ impl Git<PathBuf> {
         span.record("from", current_branch.as_ref());
         span.record("to", branch.as_ref());
 
-        tracing::debug!("{:?}", current_branch);
+        tracing::debug!("Switch to {:?}", current_branch);
+        unimplemented!("");
 
         // Check if need to stash.
         // #46
         let mut revert_stash = Stash::Dont;
-        if stash_state.is_unstashed() {
+        if stash_state.is_stash() {
             revert_stash = self.stash(cli_args.suppress, stash_state)?;
         }
 
         // Changing branch
         let mut cmd = self.command(cli_args.suppress.includes_git());
 
-        if let Branch::Other { local } = &branch {
+        if let Branch::Named { local } = &branch {
             cmd.args(["checkout", local.as_ref()]);
         } else {
             bail!("Can't change branch to current branch.")
@@ -386,7 +404,7 @@ impl Git<PathBuf> {
         }
 
         // #46
-        if stash_state.is_stashed() {
+        if stash_state.is_unstash() {
             revert_stash = self.stash(cli_args.suppress, stash_state)?;
         }
 
@@ -403,14 +421,14 @@ impl Git<PathBuf> {
         git.arg("stash");
 
         match state {
-            Stash::Stashed => {
+            Stash::Stash => {
                 git.arg("pop");
-                ret_stash = Stash::Unstashed
+                ret_stash = Stash::Unstash
             }
-            Stash::Unstashed => {
+            Stash::Unstash => {
                 if !files.is_empty() {
                     git.arg("push");
-                    ret_stash = Stash::Stashed
+                    ret_stash = Stash::Stash
                 }
             }
             Stash::Dont => return Ok(state),
@@ -430,35 +448,38 @@ impl Git<PathBuf> {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Default)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Default, Hash)]
 pub enum Stash {
-    Stashed,
+    /// Run git stash push
     #[default]
-    Unstashed,
+    Stash,
+    /// Run git stash pop
+    Unstash,
+    /// Don't run
     Dont,
 }
 
 impl Stash {
-    /// Returns `true` if the stash is [`Stashed`].
+    /// Returns `true` if the stash is [`Stash`].
     ///
-    /// [`Stashed`]: Stash::Stashed
+    /// [`Stash`]: Stash::Stash
     #[must_use]
-    pub fn is_stashed(&self) -> bool {
-        matches!(self, Self::Stashed)
+    pub fn is_stash(&self) -> bool {
+        matches!(self, Self::Stash)
     }
 
-    /// Returns `true` if the stash is [`Stashed`].
+    /// Returns `true` if the stash is [`Unstash`].
     ///
-    /// [`Stashed`]: Stash::Stashed
+    /// [`Unstash`]: Stash::Unstash
     pub fn revert_required(&self) -> bool {
-        self.is_stashed()
+        self.is_unstash()
     }
 
-    /// Returns `true` if the stash is [`Unstashed`].
+    /// Returns `true` if the stash is [`Unstash`].
     ///
-    /// [`Unstashed`]: Stash::Unstashed
+    /// [`Unstash`]: Stash::Unstash
     #[must_use]
-    pub fn is_unstashed(&self) -> bool {
-        matches!(self, Self::Unstashed)
+    pub fn is_unstash(&self) -> bool {
+        matches!(self, Self::Unstash)
     }
 }

@@ -1,31 +1,36 @@
-use std::{
-    collections::{HashMap, HashSet},
-    process::Child,
-};
+use std::process::Child;
 
+use indexmap::{IndexMap, IndexSet};
+
+use miette::{Result, miette};
+use semver::Version;
 use tracing::{info, instrument};
 
-use crate::current_span;
+use crate::{Package, PackageError, Packages, ReadToml, cli::Workspace, current_span};
 
 use super::{Task, TaskError};
 
-// TODO: Add tests to tasks.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Tasks {
-    tasks: HashMap<Task, Option<Child>>,
-    completed: HashSet<Task>,
+    tasks: IndexMap<Task, Option<Child>>,
+    completed: IndexSet<Task>,
+    packages: Packages,
 }
 
 impl Tasks {
-    pub fn new() -> Self {
-        Self::default()
+    pub fn new(packages: Packages) -> Self {
+        Self {
+            packages,
+            tasks: IndexMap::default(),
+            completed: IndexSet::default(),
+        }
     }
 
     #[instrument(skip(self))]
-    pub fn append(&mut self, tasks: Vec<(Task, Child)>) {
+    pub fn append(&mut self, tasks: Vec<(Task, Option<Child>)>) {
         for (task, child) in tasks {
             tracing::debug!("Adding {task:?} to tasks");
-            self.insert(task, Some(child));
+            self.insert(task, child);
         }
     }
 
@@ -90,10 +95,40 @@ impl Tasks {
     pub fn get_delete_tag(&self) -> Option<&Task> {
         self.tasks.keys().find(|k| k.is_delete_git_tag())
     }
+
+    pub fn tasks(&self) -> Vec<&Task> {
+        self.tasks.keys().by_ref().collect()
+    }
+
+    #[allow(dead_code)]
+    pub fn get_change_branch(&self) -> Option<&Task> {
+        for task in self.tasks() {
+            match task {
+                Task::GitSwitchBranch { .. } => return Some(task),
+                _ => continue,
+            }
+        }
+        None
+    }
+
+    pub fn packages(&self) -> &Packages {
+        &self.packages
+    }
+
+    pub fn packages_mut(&mut self) -> &mut Packages {
+        &mut self.packages
+    }
+
+    pub fn set_packages(&mut self, packages: Packages) {
+        self.packages = packages;
+    }
+    pub fn set_packages_mut(&mut self, packages: &mut Packages) {
+        self.packages = packages.clone();
+    }
 }
 
 impl std::ops::Deref for Tasks {
-    type Target = HashMap<Task, Option<Child>>;
+    type Target = IndexMap<Task, Option<Child>>;
 
     fn deref(&self) -> &Self::Target {
         &self.tasks
@@ -106,26 +141,26 @@ impl std::ops::DerefMut for Tasks {
     }
 }
 
-impl AsRef<HashMap<Task, Option<Child>>> for Tasks {
-    fn as_ref(&self) -> &HashMap<Task, Option<Child>> {
+impl AsRef<IndexMap<Task, Option<Child>>> for Tasks {
+    fn as_ref(&self) -> &IndexMap<Task, Option<Child>> {
         &self.tasks
     }
 }
 
-impl AsMut<HashMap<Task, Option<Child>>> for Tasks {
-    fn as_mut(&mut self) -> &mut HashMap<Task, Option<Child>> {
+impl AsMut<IndexMap<Task, Option<Child>>> for Tasks {
+    fn as_mut(&mut self) -> &mut IndexMap<Task, Option<Child>> {
         &mut self.tasks
     }
 }
 
-impl AsRef<HashSet<Task>> for Tasks {
-    fn as_ref(&self) -> &HashSet<Task> {
+impl AsRef<IndexSet<Task>> for Tasks {
+    fn as_ref(&self) -> &IndexSet<Task> {
         &self.completed
     }
 }
 
-impl AsMut<HashSet<Task>> for Tasks {
-    fn as_mut(&mut self) -> &mut HashSet<Task> {
+impl AsMut<IndexSet<Task>> for Tasks {
+    fn as_mut(&mut self) -> &mut IndexSet<Task> {
         &mut self.completed
     }
 }
@@ -197,5 +232,171 @@ impl Tasks {
         );
         info!("All {} task/s complete!", self.completed_tasks().len());
         Ok(self)
+    }
+}
+
+impl Tasks {
+    pub fn partition_packages(
+        &self,
+        workspace: &Workspace,
+    ) -> Result<(Vec<&Package<ReadToml>>, Vec<&Package<ReadToml>>)> {
+        workspace.partition_packages(self.packages())
+    }
+    pub fn partition_packages_mut(
+        &mut self,
+        workspace: &Workspace,
+    ) -> Result<(Vec<&mut Package<ReadToml>>, Vec<&mut Package<ReadToml>>)> {
+        workspace.partition_packages_mut(self.packages_mut())
+    }
+    pub fn partition_packages_owned(
+        &self,
+        workspace: &Workspace,
+    ) -> Result<(Vec<Package<ReadToml>>, Vec<Package<ReadToml>>)> {
+        workspace.partition_packages_owned(self.packages())
+    }
+    /// Clones tasks but without any associated [`Child`] processes.
+    pub fn clone_tasks(&self) -> Tasks {
+        let tasks: Vec<(Task, Option<Child>)> = self.keys().cloned().map(|t| (t, None)).collect();
+        Tasks {
+            tasks: IndexMap::from_iter(tasks.into_iter()),
+            completed: self.completed.clone(),
+            packages: self.packages.clone(),
+        }
+    }
+
+    /// Order of presedence:
+    /// 1. Root package version
+    /// 2. `workspace.package` version
+    /// 3. ws members sharing the same version ... version
+    pub fn root_version(&self) -> Result<Version> {
+        let packages_root_version = self.packages.root_version()?;
+        let version_tasks = self.version_change_tasks();
+        let workspace_package_version = self.packages.workspace_package();
+        let root_package = self.packages.get_root_package();
+
+        let root_package_name = root_package.map(|p| p.name().clone()).unwrap_or_default();
+
+        if version_tasks.is_empty() {
+            return Ok(packages_root_version);
+        }
+        let mut versions = IndexSet::new();
+        for task in version_tasks {
+            match task {
+                Task::Set {
+                    package_name,
+                    new_version,
+                } => {
+                    if package_name == root_package_name {
+                        return Ok(new_version);
+                    }
+                    versions.insert((3, new_version));
+                }
+                Task::SetWorkspace { new_version } => {
+                    if workspace_package_version.is_some() {
+                        versions.insert((2, new_version));
+                    }
+                }
+                Task::Bump {
+                    package_name,
+                    new_version,
+                    ..
+                } => {
+                    if package_name == root_package_name {
+                        return Ok(new_version);
+                    }
+                    versions.insert((3, new_version));
+                }
+                Task::BumpWorkspace { new_version, .. } => {
+                    if workspace_package_version.is_some() {
+                        versions.insert((2, new_version));
+                    }
+                }
+                _ => unreachable!(),
+            }
+        }
+
+        versions.sort_by(|a, b| a.0.cmp(&b.0));
+
+        for (val, version) in &versions {
+            if *val == 2 {
+                return Ok(version.clone());
+            }
+        }
+        if versions.len() == 1 {
+            Ok(versions.pop().expect("Length of 1").1)
+        } else {
+            Err(PackageError::NoRootVersion)?
+        }
+    }
+}
+
+// TODO: Add tests to tasks.
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+
+    use super::*;
+
+    use crate::{Action, Branch, Bumpable, Cli, Packages};
+
+    static TEST_BIN_NAME: &str = "cargo-uv";
+
+    fn default_cli(manifest_path: &str) -> Cli {
+        let args = vec![TEST_BIN_NAME, "--manifest-path", manifest_path]
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect();
+        Cli::cli_args(args, Some(TEST_BIN_NAME), None).expect("Valid for testing")
+    }
+
+    fn simple_packages() -> Packages {
+        let mut cli_args = default_cli("tests/fixtures/simple/Cargo.toml");
+        let meta = cli_args
+            .get_metadata()
+            .expect("testing simple: tests/fixtures/simple/Cargo.toml");
+        Packages::from(meta)
+    }
+
+    fn task_list<'a>(mut packages: Packages) -> Vec<Task> {
+        let package = packages
+            .get_root_package_mut()
+            .expect("known that simple has a root package");
+        let new_version = package
+            .version_mut()
+            .bump(Action::Major, None, None, false)
+            .expect("Set by hand");
+        vec![
+            Task::Bump {
+                package_name: package.name().clone(),
+                bump: crate::Action::Major,
+                new_version,
+            },
+            Task::GitPush {
+                remote: "origin".into(),
+                branch: Branch::from_str("main").unwrap(),
+                tag: package.version().to_string(),
+            },
+            Task::CargoPublish,
+        ]
+    }
+
+    #[test]
+    fn maintain_insertion_order_indexset() {
+        let packages = simple_packages();
+        let mut insertion_order = task_list(packages.clone());
+        let mut tasks = Tasks::new(packages.clone());
+        for task in &insertion_order {
+            tasks.insert(task.clone(), None);
+        }
+        assert_eq!(
+            insertion_order.iter().by_ref().collect::<Vec<_>>(),
+            tasks.tasks()
+        );
+        insertion_order.reverse();
+        assert_ne!(
+            insertion_order.iter().by_ref().collect::<Vec<_>>(),
+            tasks.tasks()
+        )
     }
 }

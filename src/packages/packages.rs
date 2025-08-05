@@ -1,10 +1,12 @@
 use std::io::Write;
+use std::path::Path;
 use std::{
     collections::{HashMap, HashSet},
     path::PathBuf,
 };
 
 use cargo_metadata::Metadata;
+use indexmap::IndexSet;
 use semver::Version;
 use tracing::{debug, instrument};
 
@@ -13,8 +15,10 @@ use crate::{ReadToml, Result, VersionLocation, display_path};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Packages {
-    /// File path to the root cargo.toml
-    root_manifest_path: PathBuf,
+    root_directory: PathBuf,
+    root_cargo_toml: PathBuf,
+    root_cargo_lock: PathBuf,
+
     /// Root package of the rust project.
     root_package: Option<PackageName>,
 
@@ -39,7 +43,7 @@ impl AsRef<HashMap<PackageName, Package<ReadToml>>> for Packages {
 
 impl Packages {
     pub fn new<P, N>(
-        path: PathBuf,
+        root_directory: PathBuf,
         packages: &[P],
         root_package: Option<&P>,
         default_members: Vec<N>,
@@ -48,9 +52,12 @@ impl Packages {
         P: Into<Package<ReadToml>> + Clone,
         N: ToString + Clone,
     {
-        let workspace_package = Package::workspace_package(&path).ok();
+        let root_cargo_toml = root_directory.join("Cargo.toml");
+        let root_cargo_lock = root_directory.join("Cargo.lock");
+        let workspace_package = Package::workspace_package(&root_cargo_toml).ok();
+
         let mut ret = Self {
-            root_manifest_path: path,
+            root_directory: root_directory.clone(),
             root_package: None,
             root_version: None,
             packages: HashMap::from_iter(packages.iter().map(|package| {
@@ -61,6 +68,8 @@ impl Packages {
                 default_members.iter().map(|n| PackageName(n.to_string())),
             ),
             workspace_package,
+            root_cargo_toml,
+            root_cargo_lock,
         };
         if let Some(root_package) = root_package {
             let root_package: Package<ReadToml> = root_package.clone().into();
@@ -70,11 +79,13 @@ impl Packages {
         Ok(ret)
     }
 
-    #[instrument()]
-    pub fn cargo_file_path(&self) -> &PathBuf {
+    #[instrument(skip_all)]
+    #[deprecated(since = "0.7.0", note = "Changed to root_manifest_path")]
+    pub fn cargo_file_path(&self) -> &Path {
         debug!("Fetching cargo path");
-        &self.root_manifest_path
+        self.root_manifest_path()
     }
+
     pub fn drop_root_package_name(&mut self) {
         self.root_package = None
     }
@@ -176,11 +187,11 @@ impl Packages {
         self.packages.values().collect::<HashSet<_>>()
     }
 
-    pub fn set_cargo_file_path(&mut self, cargo_file: PathBuf) {
-        self.root_manifest_path = cargo_file;
+    pub fn package_set_mut(&mut self) -> HashSet<&mut Package<ReadToml>> {
+        self.packages.values_mut().collect::<HashSet<_>>()
     }
 
-    pub(crate) fn get_root_package_version(&self) -> Option<Version> {
+    pub fn get_root_package_version(&self) -> Option<Version> {
         self.get_root_package().map(|rp| rp.version().clone())
     }
 
@@ -227,11 +238,34 @@ impl Packages {
             };
         }
 
-        Err(error_no_root_package)
+        let mut versions = IndexSet::new();
+        for ver in self.packages().values().map(|p| p.version()) {
+            versions.insert(ver);
+        }
+
+        if versions.len() == 1 {
+            Ok(versions.pop().unwrap().clone())
+        } else {
+            Err(error_no_root_package)
+        }
+    }
+    pub fn workspace_package(&self) -> Option<&Package<ReadToml>> {
+        self.workspace_package.as_ref()
+    }
+    pub fn workspace_package_mut(&mut self) -> Option<&mut Package<ReadToml>> {
+        self.workspace_package.as_mut()
     }
 
-    pub fn workspace_package(&mut self) -> Option<&mut Package<ReadToml>> {
-        self.workspace_package.as_mut()
+    pub fn root_cargo_lock_path(&self) -> &Path {
+        &self.root_cargo_lock
+    }
+
+    pub fn root_manifest_path(&self) -> &Path {
+        &self.root_cargo_toml
+    }
+
+    pub fn root_directory(&self) -> &Path {
+        &self.root_directory
     }
 }
 
@@ -239,7 +273,7 @@ impl Packages {
     pub fn display_tree(&self) -> String {
         let mut ret_string = Vec::new();
         let root_package = self.root_package.as_ref();
-        let path_base = self.cargo_file_path().parent().unwrap();
+        let path_base = self.root_directory();
         let make_relative = |package: &Package<ReadToml>| {
             PathBuf::new()
                 .join(".")
@@ -329,7 +363,7 @@ impl From<&Metadata> for Packages {
             .collect::<Vec<_>>();
         tracing::trace!("Default members {:?}", default_members);
         Self::new(
-            root_path.into(),
+            metadata.workspace_root.clone().into_std_path_buf(),
             &metadata.packages,
             metadata.root_package(),
             default_members,

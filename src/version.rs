@@ -9,8 +9,8 @@ pub trait Bumpable {
     fn bump(
         &mut self,
         action: Action,
-        pre_release: Option<Prerelease>,
-        build: Option<BuildMetadata>,
+        pre_release: Option<&Prerelease>,
+        build: Option<&BuildMetadata>,
         force_version: bool,
     ) -> Result<Version>;
 
@@ -21,12 +21,13 @@ pub trait Bumpable {
 }
 
 impl Bumpable for Version {
+    #[track_caller]
     #[instrument(fields(from, to), skip(self))]
     fn bump(
         &mut self,
         action: Action,
-        pre_release: Option<Prerelease>,
-        build: Option<BuildMetadata>,
+        pre_release: Option<&Prerelease>,
+        build: Option<&BuildMetadata>,
         force_version: bool,
     ) -> Result<Version> {
         use crate::cli::Action as BumpVer;
@@ -39,16 +40,20 @@ impl Bumpable for Version {
             BumpVer::Minor => self.try_bump_minor(force_version)?,
             BumpVer::Major => self.try_bump_major(force_version)?,
             BumpVer::Pre => self.try_bump_pre(force_version)?,
-            _ => bail!("Invalid Action: {}", action),
+            _ => bail!(
+                help = format! {"Bumpable::bump called at {}", std::panic::Location::caller()},
+                "Invalid Action: {}",
+                action
+            ),
         };
         if action != Action::Pre {
             if let Some(pre) = pre_release {
-                self.pre = pre
+                self.pre = pre.clone()
             }
         };
 
         if let Some(build) = build {
-            self.build = build
+            self.build = build.clone()
         }
         if !force_version {
             ensure!(

@@ -55,7 +55,7 @@ impl Cargo {
         cargo.spawn().into_diagnostic()
     }
 
-    pub fn generate_lockfile(&self, cli_args: &Cli) -> miette::Result<()> {
+    pub fn generate_lockfile(&self, _cli_args: &Cli) -> miette::Result<()> {
         let mut cargo = self.command(true);
         cargo.arg("generate-lockfile");
 

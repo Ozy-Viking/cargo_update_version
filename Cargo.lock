@@ -155,6 +155,7 @@ dependencies = [
  "clap-cargo",
  "clap-verbosity-flag",
  "colorchoice-clap",
+ "indexmap",
  "miette",
  "rusty_viking",
  "semver",

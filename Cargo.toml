@@ -25,6 +25,7 @@ semver = "1.0.26"
 tracing = { version = "0.1.41" }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 thiserror = { version = "2" }
+indexmap = "2.10.0"
 
 
 [[bin]]
