@@ -1,7 +1,9 @@
 # Changelog
 
-<a name="Upcoming Changes"></a>
-## [Upcoming Changes]
+
+<a name="1.0.0-rc.1"></a>
+## [1.0.0-rc.1] - 2025-08-06
+
 ### Bug Fixes
 - clean up code and improve clippy lints and formatting consistency
 - **CICD:** GHA -  Forcing apple target to be installed.
@@ -17,15 +19,34 @@
 - **git:** add branch switching with stash support
 - **task:** Completed generation of tasks then runs all tasks
 - **tasks:** implement partial Task::run with print and tree commands
+### Merged Pull Requests
+- 📝 Update Changelog ([#45](https://github.com/Ozy-Viking/cargo_update_version/issues/45))
+- add branch switching with stash support ([#42](https://github.com/Ozy-Viking/cargo_update_version/issues/42))
+- Use Process enum for tracing and error handling ([#44](https://github.com/Ozy-Viking/cargo_update_version/issues/44))
+- 📝 Update Changelog ([#38](https://github.com/Ozy-Viking/cargo_update_version/issues/38))
+- 📝 Update Changelog ([#37](https://github.com/Ozy-Viking/cargo_update_version/issues/37))
+- GHA - Forcing apple target to be installed. ([#36](https://github.com/Ozy-Viking/cargo_update_version/issues/36))
+- 📝 Update Changelog ([#35](https://github.com/Ozy-Viking/cargo_update_version/issues/35))
+- 📝 Update Changelog ([#34](https://github.com/Ozy-Viking/cargo_update_version/issues/34))
+
 
 <a name="0.7.1"></a>
 ## [0.7.1] - 2025-07-29
 
+
+<a name="0.7.1-rc.1"></a>
+## [0.7.1-rc.1] - 2025-07-30
+
 ### Bug Fixes
 - Actual build for all OSs
+- **CICD:** GHA -  Forcing apple target to be installed.
 ### Chores
 - Update readme
 ### Merged Pull Requests
+- 📝 Update Changelog ([#37](https://github.com/Ozy-Viking/cargo_update_version/issues/37))
+- GHA - Forcing apple target to be installed. ([#36](https://github.com/Ozy-Viking/cargo_update_version/issues/36))
+- 📝 Update Changelog ([#35](https://github.com/Ozy-Viking/cargo_update_version/issues/35))
+- 📝 Update Changelog ([#34](https://github.com/Ozy-Viking/cargo_update_version/issues/34))
 - 📝 Update Changelog ([#33](https://github.com/Ozy-Viking/cargo_update_version/issues/33))
 - 📝 Update Changelog ([#32](https://github.com/Ozy-Viking/cargo_update_version/issues/32))
 
@@ -183,8 +204,10 @@
 
 
 
-[Upcoming Changes]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.7.1...HEAD
-[0.7.1]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.7.0...0.7.1
+[Upcoming Changes]: https://github.com/Ozy-Viking/cargo_update_version/compare/1.0.0-rc.1...HEAD
+[1.0.0-rc.1]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.7.1...1.0.0-rc.1
+[0.7.1]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.7.1-rc.1...0.7.1
+[0.7.1-rc.1]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.7.0...0.7.1-rc.1
 [0.7.0]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.6.8...0.7.0
 [0.6.8]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.6.7...0.6.8
 [0.6.7]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.6.6...0.6.7
