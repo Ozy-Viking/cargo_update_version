@@ -2,7 +2,6 @@ use std::{path::PathBuf, str::FromStr, vec::IntoIter};
 
 use tracing::instrument;
 
-#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct GitFile {
     pub mode: String,

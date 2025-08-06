@@ -159,7 +159,7 @@ impl Bumpable for Version {
                         help = "Must only be a number after the '.' in prerelease segment.",
                         "When converting to int: {e}"
                     )
-                    .with_source_code(format!(r#"version = "{}""#, self.to_string()));
+                    .with_source_code(format!(r#"version = "{}""#, self));
 
                     return Err(err);
                 }
@@ -167,7 +167,7 @@ impl Bumpable for Version {
             let pre = Prerelease::new(&format!("{id}.{num}")).into_diagnostic()?;
             self.pre = pre
         } else {
-            bail!("Prerelease not split by '.': {}", self.pre.to_string());
+            bail!("Prerelease not split by '.': {}", self.pre);
         };
 
         ensure!(self.clone() > old_version, "PreRelease bump failed.");

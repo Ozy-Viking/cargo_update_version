@@ -1,6 +1,6 @@
 use std::{env::current_dir, fmt::Display, path::PathBuf};
 
-use miette::{IntoDiagnostic, ensure, miette};
+use miette::{IntoDiagnostic, ensure};
 
 use crate::{Action, Bumpable, Cli, PackageName, Packages, Result, Task, Tasks, VersionType};
 #[cfg(feature = "unstable")]
@@ -19,7 +19,7 @@ impl Displayable for DisplayTasks<'_> {}
 
 impl<'a> DisplayTasks<'a> {
     pub fn new(tasks: &'a Tasks) -> Self {
-        Self { tasks: tasks }
+        Self { tasks }
     }
 
     pub fn display(&self) -> Result<()> {
@@ -65,7 +65,7 @@ impl Display for DisplayTasks<'_> {
         let tasks = self.tasks();
         let last = tasks.last().expect("No way to have 0 tasks");
         for (idx, task) in tasks.iter().enumerate() {
-            let s = if &task == &last {
+            let s = if task == last {
                 self.task_item_string_last(idx + 1, task)
             } else {
                 self.task_item_string(idx + 1, task)
@@ -78,23 +78,21 @@ impl Display for DisplayTasks<'_> {
 }
 
 impl<'a> Tasks {
-    #[allow(unused_variables)]
     /// Generate tasks from user defined [Cli] arguments.
     pub fn generate_tasks(cli_args: &'a Cli, packages: Packages) -> Result<Self> {
         cli_args.try_allow_dirty()?;
         let cwd = current_dir().into_diagnostic()?;
         let root_cargo_lock = packages.root_cargo_lock_path().to_path_buf();
-        let root_manifest_path = packages.root_manifest_path().to_path_buf();
-        let packages_clone = packages.clone();
         let mut tasks = Tasks::new(packages);
         let git = cli_args.git()?;
+        #[cfg(feature = "unstable")]
         let git_files = git.dirty_files()?;
-        let cargo = cli_args.cargo()?;
         let workspace = cli_args.workspace();
         let pre_release = cli_args.pre();
         let build = cli_args.build();
         let force_version = cli_args.force_version();
 
+        #[cfg(feature = "unstable")]
         let current_branch = git.current_branch()?;
         #[cfg(feature = "unstable")]
         let mut git_stash = None;
@@ -160,7 +158,10 @@ impl<'a> Tasks {
         }
 
         if change_workspace_package_version {
-            let workspace_package = tasks.packages_mut().workspace_package_mut().ok_or(miette::miette!("workspace.pa"))?;
+            let workspace_package = tasks
+                .packages_mut()
+                .workspace_package_mut()
+                .ok_or(miette::miette!("workspace.pa"))?;
             let ws_name = workspace_package.name().clone();
             let mut new_version = workspace_package.version_owned();
 
@@ -204,7 +205,7 @@ impl<'a> Tasks {
                 for remote in git.remotes()? {
                     tasks.insert(
                         Task::GitPush {
-                            remote: remote,
+                            remote,
                             #[cfg(feature = "unstable")]
                             branch: cli_args.git_branch(),
                             tag: new_version.to_string(),
@@ -233,12 +234,12 @@ impl<'a> Tasks {
         #[cfg(feature = "unstable")]
         if let Some(Task::GitStash {
             branch,
-            stash: state,
+            stash: _stash,
         }) = git_stash
         {
             tasks.insert(
                 Task::GitStash {
-                    branch: branch,
+                    branch,
                     stash: Stash::Unstash,
                 },
                 None,

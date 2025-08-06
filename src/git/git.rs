@@ -6,15 +6,15 @@ use std::{
 };
 
 use indexmap::IndexSet;
-use miette::{Context, bail};
+use miette::bail;
 use semver::Version;
 use tracing::{debug, info, instrument, warn};
 
+#[cfg(feature = "unstable")]
+use miette::Context;
+
 use crate::{
-    Branch, Process, ProcessOutput, Result, Task,
-    cli::{Cli, Suppress},
-    current_span,
-    git::git_file::GitFiles,
+    Branch, Process, ProcessOutput, Result, cli::Suppress, current_span, git::git_file::GitFiles,
     process::OutputExt,
 };
 
@@ -172,7 +172,7 @@ impl Git<PathBuf> {
             git.arg("--dry-run");
         }
 
-        git.args(["--message", &message]);
+        git.args(["--message", message]);
         let cmd = Process::display_command(&git);
         let run = Process::Output.run(git)?;
         let output = run.as_output().unwrap();

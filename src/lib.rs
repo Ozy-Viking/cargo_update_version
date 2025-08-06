@@ -32,6 +32,8 @@ use tracing_subscriber::util::SubscriberInitExt;
 /// Footer for the [miette::MietteHandler]
 pub static FOOTER: &str = "If the bug continues, raise an issue on github: https://github.com/Ozy-Viking/cargo_update_version/issues";
 
+pub type SplitVec<T> = (Vec<T>, Vec<T>);
+
 pub fn setup_tracing(args: &Cli) -> miette::Result<()> {
     let app_level = match args.tracing_level() {
         Some(l) => l,

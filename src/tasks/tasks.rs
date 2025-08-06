@@ -5,13 +5,11 @@ use indexmap::{IndexMap, IndexSet};
 use semver::Version;
 use tracing::{info, instrument};
 
-use crate::{Cli, Package, PackageError, Packages, ReadToml, Result, cli::Workspace, current_span};
+use crate::{
+    Cli, Package, PackageError, Packages, ReadToml, Result, SplitVec, cli::Workspace, current_span,
+};
 
 use super::{Task, TaskError};
-
-#[allow(unused_imports)]
-#[cfg(feature = "unstable")]
-use std::str::FromStr;
 
 #[derive(Debug)]
 pub struct Tasks {
@@ -107,7 +105,6 @@ impl Tasks {
         self.tasks.keys().cloned().collect()
     }
 
-    #[allow(dead_code)]
     #[cfg(feature = "unstable")]
     pub fn get_change_branch(&self) -> Option<&Task> {
         for task in self.tasks() {
@@ -294,26 +291,26 @@ impl Tasks {
     pub fn partition_packages(
         &self,
         workspace: &Workspace,
-    ) -> Result<(Vec<&Package<ReadToml>>, Vec<&Package<ReadToml>>)> {
+    ) -> Result<SplitVec<&Package<ReadToml>>> {
         workspace.partition_packages(self.packages())
     }
     pub fn partition_packages_mut(
         &mut self,
         workspace: &Workspace,
-    ) -> Result<(Vec<&mut Package<ReadToml>>, Vec<&mut Package<ReadToml>>)> {
+    ) -> Result<SplitVec<&mut Package<ReadToml>>> {
         workspace.partition_packages_mut(self.packages_mut())
     }
     pub fn partition_packages_owned(
         &self,
         workspace: &Workspace,
-    ) -> Result<(Vec<Package<ReadToml>>, Vec<Package<ReadToml>>)> {
+    ) -> Result<SplitVec<Package<ReadToml>>> {
         workspace.partition_packages_owned(self.packages())
     }
     /// Clones tasks but without any associated [`Child`] processes.
     pub fn clone_tasks(&self) -> Tasks {
         let tasks: Vec<(Task, Option<Child>)> = self.keys().cloned().map(|t| (t, None)).collect();
         Tasks {
-            tasks: IndexMap::from_iter(tasks.into_iter()),
+            tasks: IndexMap::from_iter(tasks),
             completed: self.completed.clone(),
             packages: self.packages.clone(),
         }
@@ -386,6 +383,8 @@ impl Tasks {
 mod tests {
 
     use super::*;
+    #[cfg(feature = "unstable")]
+    use std::str::FromStr;
 
     #[cfg(feature = "unstable")]
     use crate::Branch;

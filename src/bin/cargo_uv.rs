@@ -10,7 +10,7 @@ fn main() -> Result<()> {
     setup_tracing(&cli_args)?;
 
     let packages = Packages::from(cli_args.get_metadata()?);
-    let mut tasks = Tasks::generate_tasks(&mut cli_args, packages)?;
+    let mut tasks = Tasks::generate_tasks(&cli_args, packages)?;
 
     tasks = tasks.run_all(&cli_args)?.join_all()?;
     tracing::info!("Completed run, starting cleanup");

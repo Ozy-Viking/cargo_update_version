@@ -4,7 +4,6 @@ use tracing::instrument;
 use crate::{Result, current_span};
 use std::process::{Child, Command, Output};
 
-#[allow(dead_code)]
 pub trait OutputExt {
     fn stderr(&self) -> String;
     fn stdout(&self) -> String;

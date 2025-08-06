@@ -4,6 +4,7 @@ pub use package_name::PackageName;
 mod package;
 pub use package::Package;
 
+#[allow(clippy::module_inception)]
 mod packages;
 pub use packages::Packages;
 

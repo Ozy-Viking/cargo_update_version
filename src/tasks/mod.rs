@@ -1,5 +1,6 @@
 mod predict_tasks;
 pub use predict_tasks::DisplayTasks;
+#[allow(clippy::module_inception)]
 mod tasks;
 pub use tasks::Tasks;
 mod task;

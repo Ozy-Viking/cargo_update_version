@@ -30,7 +30,6 @@ impl Display for CargoFileError {
     }
 }
 
-// #[allow(dead_code)]
 #[derive(Debug, thiserror::Error, miette::Diagnostic)]
 pub enum CargoFileErrorKind {
     #[error("No root package")]

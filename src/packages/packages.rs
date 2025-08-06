@@ -12,7 +12,7 @@ use semver::Version;
 use tracing::{debug, instrument};
 
 use super::{Package, PackageError, PackageName};
-use crate::{ReadToml, Result, VersionLocation, VersionLocationErrorKind, display_path};
+use crate::{ReadToml, Result, VersionLocation, display_path};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Packages {

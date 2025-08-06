@@ -3,10 +3,10 @@ use std::{fmt::Display, path::PathBuf, process::Child};
 use semver::{BuildMetadata, Prerelease, Version};
 use tracing::instrument;
 
-use crate::{
-    Action, Branch, Bumpable, Cargo, Cli, Git, Package, PackageName, Packages, ReadToml, Result,
-    Stash,
-};
+use crate::{Action, Bumpable, Cargo, Cli, Git, Package, PackageName, Packages, ReadToml, Result};
+
+#[cfg(feature = "unstable")]
+use crate::{Branch, Stash};
 
 #[derive(Hash, PartialEq, Debug, Eq, Clone)]
 pub enum Task {
@@ -78,7 +78,7 @@ impl Display for Task {
             } => &format!("Set {}: {}", package, new_version),
             Task::SetWorkspace {
                 new_version: version,
-            } => &format!("Set Workspace: {}", version.to_string()),
+            } => &format!("Set Workspace: {}", version),
             Task::CargoPublish => "Cargo Publish",
             Task::WriteCargoToml(package) => &format!("Write Cargo.toml for: {}", package),
             #[cfg(feature = "unstable")]
@@ -100,7 +100,7 @@ impl Display for Task {
             Task::GitPush { remote, tag } => &format!("Git Push: {tag} to {remote}"),
             Task::GitCommit => "Git Commit",
             Task::GitTag(version) => &format!("Git Tag: {}", version),
-            Task::DeleteGitTag(version) => &format!("Delete Git Tag: {}", version.to_string()),
+            Task::DeleteGitTag(version) => &format!("Delete Git Tag: {}", version),
             Task::CargoGenerateLock => "Cargo Generate Lockfile",
         };
         write!(f, "{}", text)
@@ -119,13 +119,13 @@ impl Task {
 
 impl Task {
     pub fn is_version_change(&self) -> bool {
-        match self {
+        matches!(
+            self,
             Task::Set { .. }
-            | Task::Bump { .. }
-            | Task::BumpWorkspace { .. }
-            | Task::SetWorkspace { .. } => true,
-            _ => false,
-        }
+                | Task::Bump { .. }
+                | Task::BumpWorkspace { .. }
+                | Task::SetWorkspace { .. }
+        )
     }
 
     /// Returns `true` if the task is [`DeleteGitTag`].
@@ -216,12 +216,10 @@ impl Task {
         let root_version = packages.root_version()?;
         let suppress = cli_args.suppress();
         let ret: Result<Option<Child>> = match self {
-            Task::GitPush { remote, tag, .. } => {
-                git.push(tag, suppress, dry_run, remote).map(|c| Some(c))
-            }
+            Task::GitPush { remote, tag, .. } => git.push(tag, suppress, dry_run, remote).map(Some),
             Task::CargoPublish => cargo
                 .publish(suppress, dry_run, no_verify, allow_dirty)
-                .map(|c| Some(c)),
+                .map(Some),
             Task::DisplayVersion(package_name) => {
                 let package = packages
                     .get_package(package_name)

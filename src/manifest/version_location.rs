@@ -4,7 +4,7 @@ use semver::Version;
 use tracing::{info, instrument, trace};
 
 use crate::{
-    CargoFile, ReadToml, current_span,
+    CargoFile, ReadToml, current_span, display_path,
     manifest::error::{ItemType, VersionlocationError},
 };
 
@@ -127,7 +127,7 @@ impl VersionLocation {
         };
         let version = ret?;
         current_span!().record("path", path.as_os_str().to_str().unwrap_or_default());
-        current_span!().record("version", &version.to_string());
+        current_span!().record("version", version.to_string());
         info!("Version found");
 
         Ok(version)
@@ -135,7 +135,7 @@ impl VersionLocation {
 
     #[track_caller]
     #[instrument(skip_all, fields(version, path))]
-    pub fn set_version<'a>(
+    pub fn set_version(
         &self,
         cargo_toml: &mut CargoFile<ReadToml>,
         version: &Version,
@@ -171,7 +171,10 @@ impl VersionLocation {
                     ErrKind::NotFound(*self),
                     Some("Package table located."),
                 ))? {
-                    toml_edit::Item::Value(value) => Ok(*value = version.to_string().into()),
+                    toml_edit::Item::Value(value) => {
+                        *value = version.to_string().into();
+                        Ok(())
+                    }
                     item => Err(set_err(
                         ErrKind::ItemInvalid(item.into()),
                         Some("Invalid itemtype for setting package version."),
@@ -186,7 +189,7 @@ impl VersionLocation {
                 let ws_kind = ItemType::from(&*workspace);
                 let workspace = workspace.as_table_mut().ok_or_else(|| {
                     set_err(
-                        ErrKind::ItemInvalid(ws_kind.into()),
+                        ErrKind::ItemInvalid(ws_kind),
                         Some("Tried to get package table"),
                     )
                 })?;
@@ -197,7 +200,7 @@ impl VersionLocation {
 
                 let package = package.as_table_mut().ok_or_else(|| {
                     set_err(
-                        ErrKind::ItemInvalid(pack_kind.into()),
+                        ErrKind::ItemInvalid(pack_kind),
                         Some("Tried to get package table"),
                     )
                 })?;
@@ -205,7 +208,10 @@ impl VersionLocation {
                     ErrKind::NotFound(*self),
                     Some("Package table located."),
                 ))? {
-                    toml_edit::Item::Value(value) => Ok(*value = version.to_string().into()),
+                    toml_edit::Item::Value(value) => {
+                        *value = version.to_string().into();
+                        Ok(())
+                    }
                     item => Err(set_err(
                         ErrKind::ItemInvalid(item.into()),
                         Some("Invalid itemtype for setting workspace version."),
@@ -213,8 +219,8 @@ impl VersionLocation {
                 }
             }
         };
-        let _version = ret?;
-        current_span!().record("path", (&path).as_os_str().to_str().unwrap_or_default());
+        ret?;
+        current_span!().record("path", display_path!(path).to_string());
         info!("Version set: {version}");
         Ok(())
     }

@@ -110,15 +110,16 @@ impl CargoFile<ReadToml> {
     }
     #[instrument(skip_all)]
     pub fn get_package_version(&self) -> Option<Version> {
-        VersionLocation::Package.get_version(&self).ok()
+        VersionLocation::Package.get_version(self).ok()
     }
     #[instrument(skip_all)]
     pub fn get_workspace_version(&self) -> Option<Version> {
-        VersionLocation::WorkspacePackage.get_version(&self).ok()
+        VersionLocation::WorkspacePackage.get_version(self).ok()
     }
 
     #[track_caller]
     #[instrument(skip(self))]
+    #[allow(clippy::result_large_err)]
     pub fn set_package_version(
         &mut self,
         new_version: &Version,
@@ -126,13 +127,14 @@ impl CargoFile<ReadToml> {
         VersionLocation::Package
             .set_version(self, new_version)
             .map_err(|e: VersionlocationError| {
-                let path = (&e).path().to_path_buf();
+                let path = e.path().to_path_buf();
                 CargoFileErrorKind::LocationError(e).to_error(path)
             })
     }
 
     #[track_caller]
     #[instrument(skip(self))]
+    #[allow(clippy::result_large_err)]
     pub fn set_workspace_version(
         &mut self,
         new_version: &Version,
@@ -140,13 +142,14 @@ impl CargoFile<ReadToml> {
         VersionLocation::WorkspacePackage
             .set_version(self, new_version)
             .map_err(|e: VersionlocationError| {
-                let path = (&e).path().to_path_buf();
+                let path = e.path().to_path_buf();
                 CargoFileErrorKind::LocationError(e).to_error(path)
             })
     }
 
     #[track_caller]
     #[instrument(skip(self))]
+    #[allow(clippy::result_large_err)]
     pub fn set_version(&mut self, new_version: Version) -> miette::Result<(), CargoFileError> {
         tracing::warn!("set version start");
         let cargo_path = self.path().to_path_buf();

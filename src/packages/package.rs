@@ -81,7 +81,7 @@ impl From<cargo_metadata::Package> for Package<ReadToml> {
             version: meta_package.version,
             version_type: Package::set_version_type(&cargo_file)
                 .expect("Cargo manifest run with no error"),
-            cargo_file: cargo_file,
+            cargo_file,
             manifest_path,
         }
     }

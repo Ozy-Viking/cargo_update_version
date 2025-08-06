@@ -1,4 +1,5 @@
 mod action;
+#[allow(clippy::module_inception)]
 mod cli;
 mod git_ops;
 mod manifest;

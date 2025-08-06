@@ -5,7 +5,7 @@ use std::collections::HashSet;
 
 use tracing::{instrument, trace};
 
-use crate::{Package, PackageName, Packages, ReadToml, Result, cli::WORKSPACE_HEADER};
+use crate::{Package, PackageName, Packages, ReadToml, Result, SplitVec, cli::WORKSPACE_HEADER};
 
 /// Cargo flags for selecting crates in a workspace.
 #[derive(Default, Clone, Debug, PartialEq, Eq, clap::Args)]
@@ -43,7 +43,7 @@ impl Workspace {
     pub fn partition_packages<'m>(
         &self,
         packages: &'m Packages,
-    ) -> Result<(Vec<&'m Package<ReadToml>>, Vec<&'m Package<ReadToml>>)> {
+    ) -> Result<SplitVec<&'m Package<ReadToml>>> {
         let selection = PackagesCli::from_flags(
             self.workspace,
             self.default_members,
@@ -74,7 +74,7 @@ impl Workspace {
     pub fn partition_packages_owned(
         &self,
         packages: &Packages,
-    ) -> Result<(Vec<Package<ReadToml>>, Vec<Package<ReadToml>>)> {
+    ) -> Result<SplitVec<Package<ReadToml>>> {
         self.partition_packages(packages).map(|(i, e)| {
             (
                 i.into_iter().cloned().collect(),
@@ -86,10 +86,7 @@ impl Workspace {
     pub fn partition_packages_mut<'m>(
         &self,
         packages: &'m mut Packages,
-    ) -> Result<(
-        Vec<&'m mut Package<ReadToml>>,
-        Vec<&'m mut Package<ReadToml>>,
-    )> {
+    ) -> Result<SplitVec<&'m mut Package<ReadToml>>> {
         let packages_clone = packages.clone();
         let selection = PackagesCli::from_flags(
             self.workspace,
