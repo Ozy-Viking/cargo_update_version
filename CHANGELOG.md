@@ -3,11 +3,20 @@
 <a name="Upcoming Changes"></a>
 ## [Upcoming Changes]
 ### Bug Fixes
+- clean up code and improve clippy lints and formatting consistency
 - **CICD:** GHA -  Forcing apple target to be installed.
+- **tasks:** Fixed import of FromStr
 ### Code Refactoring
+- add Packages to Task
+- Add Git and Cargo gen from Cli
+- **Tasks:** split tasks mod into sub mods
 - **git:** unify process handling and improve error context
 ### Features
+- Cli flag for display tasks
+- **cli:** add optional unstable branch support and improve task display formatting
 - **git:** add branch switching with stash support
+- **task:** Completed generation of tasks then runs all tasks
+- **tasks:** implement partial Task::run with print and tree commands
 
 <a name="0.7.1"></a>
 ## [0.7.1] - 2025-07-29
