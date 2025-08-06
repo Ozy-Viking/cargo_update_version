@@ -66,3 +66,14 @@ impl PartialEq<PackageName> for String {
         other.eq(self)
     }
 }
+
+impl PackageName {
+    pub fn is_workspace_package(&self) -> bool {
+        self.0 == PackageName::workspace_package()
+    }
+
+    /// [`PackageName("workspace.package")`]
+    pub fn workspace_package() -> PackageName {
+        PackageName("workspace.package".into())
+    }
+}

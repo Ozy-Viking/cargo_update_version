@@ -1,14 +1,24 @@
-use std::process::{Child, Command, Stdio};
+use std::{
+    path::PathBuf,
+    process::{Child, Command, Stdio},
+};
 
 use miette::IntoDiagnostic;
 use tracing::{debug, instrument};
 
-use crate::{GitBuilder, cli::Cli};
+use crate::{Process, cli::Suppress};
 
-pub struct Cargo;
+#[derive(Debug, Default)]
+pub struct Cargo {
+    manifest_path: Option<PathBuf>,
+}
 impl Cargo {
+    pub fn new(manifest_path: Option<PathBuf>) -> Self {
+        Self { manifest_path }
+    }
+
     #[instrument(name = "Cargo::command")]
-    pub fn command(supress_stdout: bool) -> Command {
+    pub fn command(&self, supress_stdout: bool) -> Command {
         let mut cargo = Command::new("cargo");
         if !supress_stdout {
             debug!("Inherit");
@@ -16,45 +26,44 @@ impl Cargo {
         } else {
             cargo.stdout(Stdio::piped());
         }
+
+        if let Some(manifest_path) = self.manifest_path.as_ref() {
+            cargo.arg("--manifest-path").arg(manifest_path);
+        }
+
         cargo
     }
 
-    pub fn publish(cli_args: &Cli) -> miette::Result<Child> {
-        let mut cargo = Cargo::command(cli_args.suppress.includes_cargo());
+    pub fn publish(
+        &self,
+        suppress: Suppress,
+        dry_run: bool,
+        no_verify: bool,
+        allow_dirty: bool,
+    ) -> miette::Result<Child> {
+        let mut cargo = self.command(suppress.includes_cargo());
         cargo.arg("publish");
-        if cli_args.dry_run() {
+        if dry_run {
             cargo.arg("--dry-run");
         }
-        let git = GitBuilder::new()
-            .root_directory(cli_args.root_dir()?)
-            .build();
-        git.dirty_files()?;
-        if cli_args.manifest.manifest_path.is_some() {
-            cargo
-                .arg("--manifest-path")
-                .arg(cli_args.manifest.manifest_path.clone().unwrap());
-        }
-        if cli_args.no_verify() {
+
+        if no_verify {
             cargo.arg("--no-verify");
         }
 
         // BUG: Be able to remove --allow-dirty #1
-        cargo.args(["--allow-dirty"]);
-        tracing::debug!("Running: {:?}", cargo);
-        cargo.spawn().into_diagnostic()
+        // cargo.args(["--allow-dirty"]);
+        if allow_dirty {
+            cargo.args(["--allow-dirty"]);
+        }
+        Process::Spawn.run(cargo)?.try_into_child()
     }
 
-    pub fn generate_lockfile(cli_args: &Cli) -> miette::Result<()> {
-        let mut cargo = Cargo::command(true);
+    pub fn generate_lockfile(&self) -> miette::Result<()> {
+        let mut cargo = self.command(true);
         cargo.arg("generate-lockfile");
-        if cli_args.manifest.manifest_path.is_some() {
-            cargo
-                .arg("--manifest-path")
-                .arg(cli_args.manifest.manifest_path.clone().unwrap());
-        }
 
-        tracing::debug!("Running: {:?}", cargo);
-        let output = cargo.output().into_diagnostic()?;
+        let output = Process::Output.run(cargo)?.try_into_output()?;
         if !output.status.success() {
             Err(
                 miette::miette!("{}", String::from_utf8(output.stderr).into_diagnostic()?)

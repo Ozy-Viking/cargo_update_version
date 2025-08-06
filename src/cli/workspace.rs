@@ -5,7 +5,7 @@ use std::collections::HashSet;
 
 use tracing::{instrument, trace};
 
-use crate::{Package, PackageName, Packages, ReadToml, Result, cli::WORKSPACE_HEADER};
+use crate::{Package, PackageName, Packages, ReadToml, Result, SplitVec, cli::WORKSPACE_HEADER};
 
 /// Cargo flags for selecting crates in a workspace.
 #[derive(Default, Clone, Debug, PartialEq, Eq, clap::Args)]
@@ -43,7 +43,7 @@ impl Workspace {
     pub fn partition_packages<'m>(
         &self,
         packages: &'m Packages,
-    ) -> Result<(Vec<&'m Package<ReadToml>>, Vec<&'m Package<ReadToml>>)> {
+    ) -> Result<SplitVec<&'m Package<ReadToml>>> {
         let selection = PackagesCli::from_flags(
             self.workspace,
             self.default_members,
@@ -68,9 +68,52 @@ impl Workspace {
             .package_set()
             .into_iter()
             // Deviating from cargo by not supporting patterns
-            .partition(|package: &&Package<ReadToml>| {
-                modifications.include(&base_ids, package.name())
-            }))
+            .partition(|package| modifications.include(&base_ids, package.name())))
+    }
+
+    pub fn partition_packages_owned(
+        &self,
+        packages: &Packages,
+    ) -> Result<SplitVec<Package<ReadToml>>> {
+        self.partition_packages(packages).map(|(i, e)| {
+            (
+                i.into_iter().cloned().collect(),
+                e.into_iter().cloned().collect(),
+            )
+        })
+    }
+
+    pub fn partition_packages_mut<'m>(
+        &self,
+        packages: &'m mut Packages,
+    ) -> Result<SplitVec<&'m mut Package<ReadToml>>> {
+        let packages_clone = packages.clone();
+        let selection = PackagesCli::from_flags(
+            self.workspace,
+            self.default_members,
+            &self.exclude,
+            &self.package,
+        );
+        let root_package = packages.root_package_name();
+        let modifications: &PackagesCliModifier<'_> = selection.as_ref();
+        let workspace_members = packages_clone.workspace_members();
+        let workspace_default_members: HashSet<&PackageName> =
+            packages_clone.workspace_default_members();
+
+        let base_ids = match selection {
+            PackagesCli::RootPackage(_) => workspace_members
+                .iter()
+                .filter_map(|&p| (Some(p) == root_package).then_some(p))
+                .collect(),
+            PackagesCli::All(_) => workspace_members,
+            PackagesCli::DefaultMembers(_) => workspace_default_members,
+        };
+
+        Ok(packages
+            .package_set_mut()
+            .into_iter()
+            // Deviating from cargo by not supporting patterns
+            .partition(|package| modifications.include(&base_ids, package.name())))
     }
 }
 

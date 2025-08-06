@@ -1,15 +1,17 @@
 use std::{ops::Deref, path::PathBuf};
 
+#[cfg(feature = "unstable")]
+use crate::Branch;
+use crate::current_span;
 use crate::{
-    Action, Branch, GitBuilder, Result,
+    Action, Cargo, Git, GitBuilder, Result,
     cli::{CARGO_HEADER, GitOps, Manifest, Suppress, Workspace},
 };
 use cargo_metadata::Metadata;
+use clap::{CommandFactory, FromArgMatches};
 use miette::IntoDiagnostic;
 use semver::Version;
 use tracing::{Level, debug, instrument};
-
-use crate::current_span;
 // use clap::ValueHint;
 
 pub const CLAP_STYLING: clap::builder::styling::Styles = clap::builder::styling::Styles::styled()
@@ -78,6 +80,10 @@ pub struct Cli {
 
     #[arg(skip)]
     metadata: Option<Metadata>,
+
+    /// Display the tasks that will be run.
+    #[arg(long)]
+    display_tasks: bool,
 }
 
 impl Cli {
@@ -149,7 +155,7 @@ impl Cli {
         if self.allow_dirty {
             return Ok(());
         }
-        let git = GitBuilder::new().root_directory(self.root_dir()?).build();
+        let git = self.git()?;
         let files: crate::GitFiles = git.dirty_files()?;
         let count = files.len();
 
@@ -212,12 +218,60 @@ impl Cli {
         self.no_verify
     }
 
+    #[cfg(feature = "unstable")]
     pub fn git_branch(&self) -> Branch {
         self.git_ops.branch()
     }
 
+    #[cfg(feature = "unstable")]
     pub fn is_current_branch(&self) -> bool {
         self.git_branch().is_current()
+    }
+
+    pub fn display_tasks(&self) -> bool {
+        self.display_tasks
+    }
+
+    pub fn workspace_package(&self) -> bool {
+        self.workspace_package
+    }
+
+    pub(crate) fn workspace(&self) -> &Workspace {
+        &self.workspace
+    }
+
+    pub fn git(&self) -> Result<Git<PathBuf>> {
+        Ok(GitBuilder::new().root_directory(self.root_dir()?).build())
+    }
+
+    pub fn cargo(&self) -> Result<Cargo> {
+        let cargo;
+        if let Some(path) = self.manifest.manifest_path.as_ref() {
+            if path.is_dir() {
+                cargo = Cargo::new(Some(path.join("Cargo.toml")));
+            } else {
+                cargo = Cargo::new(Some(path.to_path_buf()));
+            }
+        } else {
+            cargo = Cargo::default();
+        }
+        Ok(cargo)
+    }
+
+    pub fn pre(&self) -> Option<&semver::Prerelease> {
+        self.pre.as_ref()
+    }
+
+    pub fn build(&self) -> Option<&semver::BuildMetadata> {
+        self.build.as_ref()
+    }
+
+    pub fn set_version(&self) -> Option<Version> {
+        self.set_version.clone()
+    }
+
+    pub fn suppress(&self) -> Suppress {
+        self.suppress
     }
 
     // /// Partition workspace members into those selected and those excluded.
@@ -250,5 +304,29 @@ impl Deref for Cli {
 impl Cli {
     pub fn metadata(&self) -> Option<&Metadata> {
         self.metadata.as_ref()
+    }
+
+    // BUG: #27 Cli ignores any use of 'uv' in args.
+    pub fn cli_args(
+        args: Vec<String>,
+        bin_name: Option<&str>,
+        ignore: Option<&str>,
+    ) -> Result<Cli> {
+        let input: Vec<_> = if let Some(ign) = ignore {
+            args.iter()
+                .filter(|&a| a != ign)
+                .cloned()
+                .collect::<Vec<_>>()
+        } else {
+            args
+        };
+        let mut cli = Cli::command();
+        if let Some(bin) = bin_name {
+            cli.set_bin_name(bin);
+        }
+        cli = cli.mut_arg("set_version", |a| a.required_if_eq("action", Action::Set));
+        cli = cli.next_line_help(false);
+
+        Cli::from_arg_matches(&cli.get_matches_from(&input)).into_diagnostic()
     }
 }

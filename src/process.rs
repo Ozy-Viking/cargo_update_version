@@ -1,10 +1,9 @@
-use miette::IntoDiagnostic;
+use miette::{IntoDiagnostic, bail};
 use tracing::instrument;
 
 use crate::{Result, current_span};
 use std::process::{Child, Command, Output};
 
-#[allow(dead_code)]
 pub trait OutputExt {
     fn stderr(&self) -> String;
     fn stdout(&self) -> String;
@@ -29,6 +28,7 @@ pub enum ProcessOutput {
 }
 
 impl ProcessOutput {
+    #[track_caller]
     pub fn as_output(&self) -> Option<&Output> {
         if let Self::Output(v) = self {
             Some(v)
@@ -37,11 +37,38 @@ impl ProcessOutput {
         }
     }
 
+    #[track_caller]
     pub fn as_child(&self) -> Option<&Child> {
         if let Self::Child(v) = self {
             Some(v)
         } else {
             None
+        }
+    }
+
+    /// Errors if not [`ProcessOutput::Child`]
+    #[track_caller]
+    pub fn try_into_child(self) -> Result<Child> {
+        if let Self::Child(v) = self {
+            Ok(v)
+        } else {
+            bail!(
+                help = format!("Called from: {}", std::panic::Location::caller()),
+                "Expected to be child"
+            )
+        }
+    }
+
+    /// Errors if not [`ProcessOutput::Output`]
+    #[track_caller]
+    pub fn try_into_output(self) -> Result<Output> {
+        if let Self::Output(v) = self {
+            Ok(v)
+        } else {
+            bail!(
+                help = format!("Called from: {}", std::panic::Location::caller()),
+                "Expected to be output"
+            )
         }
     }
 }

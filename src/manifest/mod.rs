@@ -5,7 +5,7 @@ pub(crate) mod version_location;
 use miette::Result;
 use tracing::{info, instrument, warn};
 
-use crate::{Cli, Packages, error::ManifestNotFoundError};
+use crate::{Cli, Packages, display_path, error::ManifestNotFoundError};
 
 #[instrument(skip(args), fields(cargo_file))]
 pub fn generate_packages(args: &mut Cli) -> Result<Packages> {
@@ -53,11 +53,11 @@ pub fn generate_packages(args: &mut Cli) -> Result<Packages> {
             unreachable!()
         }
     };
-    let mut packages = Packages::from(&metadata);
-    let cargo_file = metadata.workspace_root.clone().join("Cargo.toml");
-    tracing::Span::current().record("cargo_file", cargo_file.clone().to_string());
+    let packages = Packages::from(&metadata);
+    let cargo_file = packages.root_manifest_path();
+    tracing::Span::current().record("cargo_file", display_path!(cargo_file).to_string());
     if cargo_file.exists() {
-        info!("Found")
+        info!("Root cargo file exists");
     } else {
         warn!("Not Found");
         // TODO: Validate this error.
@@ -69,8 +69,6 @@ pub fn generate_packages(args: &mut Cli) -> Result<Packages> {
             msg: "Cargo.toml file was not found by Cargo".into(),
         })?;
     }
-
-    packages.set_cargo_file_path(cargo_file.into());
 
     Ok(packages)
 }

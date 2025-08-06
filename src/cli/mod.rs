@@ -1,4 +1,5 @@
 mod action;
+#[allow(clippy::module_inception)]
 mod cli;
 mod git_ops;
 mod manifest;
@@ -7,7 +8,7 @@ mod workspace;
 
 pub use action::Action;
 pub use cli::Cli;
-pub use git_ops::{Branch, GitOps};
+pub use git_ops::GitOps;
 pub use manifest::Manifest;
 pub use suppress::Suppress;
 pub use workspace::Workspace;
