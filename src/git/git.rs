@@ -374,11 +374,6 @@ impl Git<PathBuf> {
             );
         }
 
-        // XXX: #46 move out of here and into own task.
-        // if stash_state.is_unstash() {
-        //     revert_stash = self.stash(cli_args.suppress, stash_state)?;
-        // }
-
         Ok(current_branch)
     }
 

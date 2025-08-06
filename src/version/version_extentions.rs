@@ -212,11 +212,21 @@ impl Setable for Version {
     }
 }
 
-#[allow(dead_code)]
-/// TODO: Implement for any incrimentable type within reason.
-pub trait Incrimentable {
-    fn increment(&mut self);
-    fn increment_by(&mut self, n: isize);
+pub trait Incrementable {
+    fn increment(&mut self) {
+        self.increment_by(1)
+    }
+    fn increment_by(&mut self, n: u64);
+}
+
+impl Incrementable for u64 {
+    fn increment(&mut self) {
+        *self += 1;
+    }
+
+    fn increment_by(&mut self, n: u64) {
+        *self += n;
+    }
 }
 
 // #[cfg(test)]
