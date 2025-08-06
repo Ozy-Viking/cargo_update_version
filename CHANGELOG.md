@@ -4,6 +4,8 @@
 ## [Upcoming Changes]
 ### Bug Fixes
 - Added imports for failing doctests
+### Chores
+- Version bump
 
 <a name="1.0.0-rc.1"></a>
 ## [1.0.0-rc.1] - 2025-08-06
