@@ -1,11 +1,21 @@
 # Changelog
 
-<a name="Upcoming Changes"></a>
-## [Upcoming Changes]
+
+<a name="1.0.0-rc.2"></a>
+## [1.0.0-rc.2] - 2025-08-06
+
 ### Bug Fixes
 - Added imports for failing doctests
 ### Chores
 - Version bump
+### Merged Pull Requests
+- Version bump ([#55](https://github.com/Ozy-Viking/cargo_update_version/issues/55))
+- 📝 Update Changelog ([#54](https://github.com/Ozy-Viking/cargo_update_version/issues/54))
+- Added imports for failing doctests ([#53](https://github.com/Ozy-Viking/cargo_update_version/issues/53))
+- 📝 Update Changelog ([#52](https://github.com/Ozy-Viking/cargo_update_version/issues/52))
+- 📝 Update Changelog ([#50](https://github.com/Ozy-Viking/cargo_update_version/issues/50))
+- Display tasks that will be completed ([#48](https://github.com/Ozy-Viking/cargo_update_version/issues/48))
+
 
 <a name="1.0.0-rc.1"></a>
 ## [1.0.0-rc.1] - 2025-08-06
@@ -210,7 +220,8 @@
 
 
 
-[Upcoming Changes]: https://github.com/Ozy-Viking/cargo_update_version/compare/1.0.0-rc.1...HEAD
+[Upcoming Changes]: https://github.com/Ozy-Viking/cargo_update_version/compare/1.0.0-rc.2...HEAD
+[1.0.0-rc.2]: https://github.com/Ozy-Viking/cargo_update_version/compare/1.0.0-rc.1...1.0.0-rc.2
 [1.0.0-rc.1]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.7.1...1.0.0-rc.1
 [0.7.1]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.7.1-rc.1...0.7.1
 [0.7.1-rc.1]: https://github.com/Ozy-Viking/cargo_update_version/compare/0.7.0...0.7.1-rc.1
