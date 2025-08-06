@@ -1,5 +1,9 @@
 # Changelog
 
+<a name="Upcoming Changes"></a>
+## [Upcoming Changes]
+### Bug Fixes
+- Added imports for failing doctests
 
 <a name="1.0.0-rc.1"></a>
 ## [1.0.0-rc.1] - 2025-08-06
