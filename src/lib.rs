@@ -8,7 +8,7 @@ pub(crate) mod manifest;
 pub(crate) mod packages;
 pub(crate) mod process;
 pub(crate) mod tasks;
-pub(crate) mod version;
+pub mod version;
 
 pub use cargo::Cargo;
 pub use cli::{Action, Cli};
@@ -23,7 +23,7 @@ pub use miette::Result;
 pub use packages::{Package, PackageError, PackageName, Packages};
 pub use process::{OutputExt, Process, ProcessOutput};
 pub use tasks::{DisplayTasks, Task, TaskError, Tasks};
-pub use version::{Bumpable, Setable};
+pub use version::{Bumpable, Incrementable, Setable};
 
 use miette::{IntoDiagnostic, bail};
 use tracing::{Level, info};
