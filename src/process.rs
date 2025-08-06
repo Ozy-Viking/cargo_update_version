@@ -96,7 +96,9 @@ impl Process {
 
     /// Turns a [Command] into a [String] for displaying.
     ///
-    /// ```no_run
+    /// ```
+    /// # use std::process::Command;
+    /// # use cargo_uv::Process;
     /// let mut cmd = Command::new("git");
     /// cmd.arg("not").arg("a").arg("command");
     /// assert_eq!("git not a command", Process::display_command(&cmd).as_str());
