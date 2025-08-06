@@ -6,8 +6,7 @@ use rusty_viking::EnumDisplay;
 #[derive(Debug, PartialEq, Eq, Clone, Copy, clap::ValueEnum, Default, EnumDisplay, Hash)]
 #[Lower]
 pub enum Action {
-    #[value(help = "Bump the version 1 prerelease level.", hide(true))]
-    // TODO: Remove when implemented.
+    #[value(help = "Bump the version 1 prerelease level.")]
     Pre,
     #[value(help = "Bump the version 1 patch level.")]
     Patch,
