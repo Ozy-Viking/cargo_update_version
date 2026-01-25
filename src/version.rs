@@ -46,10 +46,10 @@ impl Bumpable for Version {
                 action
             ),
         };
-        if action != Action::Pre {
-            if let Some(pre) = pre_release {
-                self.pre = pre.clone()
-            }
+        if action != Action::Pre
+            && let Some(pre) = pre_release
+        {
+            self.pre = pre.clone()
         };
 
         if let Some(build) = build {
