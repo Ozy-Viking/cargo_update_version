@@ -207,309 +207,266 @@ impl<'p> PackagesCli<'p> {
         }
     }
 }
-// (false, 0, 0) => PackagesCli::Default,
-// (false, 0, _) => PackagesCli::Packages(package),
-// (false, _, 0) => PackagesCli::OptOut(exclude),
-// (false, _, _) => PackagesCli::Packages(package),
-// (true, 0, _) => PackagesCli::All,
-// (true, _, _) => PackagesCli::OptOut(exclude),
-// #[cfg(test)]
-// mod test {
-//     use super::*;
+#[cfg(test)]
+mod tests {
+    use cargo_metadata::MetadataCommand;
 
-//     #[test]
-//     fn verify_app() {
-//         #[derive(Debug, clap::Parser)]
-//         struct Cli {
-//             #[command(flatten)]
-//             workspace: Workspace,
-//         }
+    use super::*;
+    use crate::Packages;
 
-//         use clap::CommandFactory;
-//         Cli::command().debug_assert();
-//     }
+    fn fixture(relative: &str) -> std::path::PathBuf {
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures")
+            .join(relative)
+    }
 
-//     #[test]
-//     fn parse_multiple_occurrences() {
-//         use clap::Parser;
+    fn packages_from(manifest: &str) -> Packages {
+        let metadata = MetadataCommand::new()
+            .manifest_path(fixture(manifest))
+            .exec()
+            .unwrap();
+        Packages::from(&metadata)
+    }
 
-//         #[derive(PartialEq, Eq, Debug, Parser)]
-//         struct Args {
-//             positional: Option<String>,
-//             #[command(flatten)]
-//             workspace: Workspace,
-//         }
+    #[test]
+    fn verify_app() {
+        #[derive(Debug, clap::Parser)]
+        struct Cli {
+            #[command(flatten)]
+            workspace: Workspace,
+        }
+        use clap::CommandFactory;
+        Cli::command().debug_assert();
+    }
 
-//         assert_eq!(
-//             Args {
-//                 positional: None,
-//                 workspace: Workspace {
-//                     package: vec![],
-//                     workspace: false,
-//                     all: false,
-//                     exclude: vec![],
-//                 }
-//             },
-//             Args::parse_from(["test"])
-//         );
-//         assert_eq!(
-//             Args {
-//                 positional: Some("baz".to_owned()),
-//                 workspace: Workspace {
-//                     package: vec!["foo".to_owned(), "bar".to_owned()],
-//                     workspace: false,
-//                     all: false,
-//                     exclude: vec![],
-//                 }
-//             },
-//             Args::parse_from(["test", "--package", "foo", "--package", "bar", "baz"])
-//         );
-//         assert_eq!(
-//             Args {
-//                 positional: Some("baz".to_owned()),
-//                 workspace: Workspace {
-//                     package: vec![],
-//                     workspace: false,
-//                     all: false,
-//                     exclude: vec!["foo".to_owned(), "bar".to_owned()],
-//                 }
-//             },
-//             Args::parse_from(["test", "--exclude", "foo", "--exclude", "bar", "baz"])
-//         );
-//     }
+    #[test]
+    fn parse_flags() {
+        use clap::Parser;
 
-// #[cfg(test)]
-// mod partition_default {
-//     use super::*;
+        #[derive(PartialEq, Eq, Debug, Parser)]
+        struct Args {
+            positional: Option<String>,
+            #[command(flatten)]
+            workspace: Workspace,
+        }
 
-//     #[test]
-//     fn single_crate() {
-//         let mut metadata = cargo_metadata::MetadataCommand::new();
-//         metadata.manifest_path("tests/fixtures/simple/Cargo.toml");
-//         let metadata = metadata.exec().unwrap();
+        assert_eq!(
+            Args::parse_from(["test"]),
+            Args {
+                positional: None,
+                workspace: Workspace::default(),
+            }
+        );
+        assert_eq!(
+            Args::parse_from(["test", "--package", "foo", "--package", "bar", "baz"]),
+            Args {
+                positional: Some("baz".to_owned()),
+                workspace: Workspace {
+                    package: vec!["foo".to_owned(), "bar".to_owned()],
+                    ..Default::default()
+                },
+            }
+        );
+        assert_eq!(
+            Args::parse_from(["test", "--exclude", "foo", "--exclude", "bar", "baz"]),
+            Args {
+                positional: Some("baz".to_owned()),
+                workspace: Workspace {
+                    exclude: vec!["foo".to_owned(), "bar".to_owned()],
+                    ..Default::default()
+                },
+            }
+        );
+        assert_eq!(
+            Args::parse_from(["test", "--workspace"]),
+            Args {
+                positional: None,
+                workspace: Workspace {
+                    workspace: true,
+                    ..Default::default()
+                },
+            }
+        );
+    }
 
-//         let workspace = Workspace {
-//             ..Default::default()
-//         };
-//         let (included, excluded) = workspace.partition_packages(&metadata);
-//         assert_eq!(included.len(), 1);
-//         assert_eq!(excluded.len(), 0);
-//     }
+    mod partition_default {
+        use super::*;
 
-//     #[test]
-//     fn mixed_ws_root() {
-//         let mut metadata = cargo_metadata::MetadataCommand::new();
-//         metadata.manifest_path("tests/fixtures/mixed_ws/Cargo.toml");
-//         let metadata = metadata.exec().unwrap();
+        #[test]
+        fn single_crate() {
+            let packages = packages_from("simple/Cargo.toml");
+            let (included, excluded) = Workspace::default()
+                .partition_packages(&packages)
+                .unwrap();
+            assert_eq!(included.len(), 1);
+            assert_eq!(excluded.len(), 0);
+        }
 
-//         let workspace = Workspace {
-//             ..Default::default()
-//         };
-//         let (included, excluded) = workspace.partition_packages(&metadata);
-//         assert_eq!(included.len(), 1);
-//         assert_eq!(excluded.len(), 2);
-//     }
+        #[test]
+        fn mixed_ws_from_root() {
+            let packages = packages_from("mixed_ws/Cargo.toml");
+            let (included, excluded) = Workspace::default()
+                .partition_packages(&packages)
+                .unwrap();
+            // default selects only the workspace root package
+            assert_eq!(included.len(), 1);
+            assert_eq!(excluded.len(), 2);
+        }
 
-//     #[test]
-//     fn mixed_ws_leaf() {
-//         let mut metadata = cargo_metadata::MetadataCommand::new();
-//         metadata.manifest_path("tests/fixtures/mixed_ws/c/Cargo.toml");
-//         let metadata = metadata.exec().unwrap();
+        #[test]
+        fn mixed_ws_from_leaf() {
+            // cargo metadata resolves back to workspace root regardless of entry manifest
+            let packages = packages_from("mixed_ws/c/Cargo.toml");
+            let (included, excluded) = Workspace::default()
+                .partition_packages(&packages)
+                .unwrap();
+            assert_eq!(included.len(), 1);
+            assert_eq!(excluded.len(), 2);
+        }
 
-//         let workspace = Workspace {
-//             ..Default::default()
-//         };
-//         let (included, excluded) = workspace.partition_packages(&metadata);
-//         assert_eq!(included.len(), 1);
-//         assert_eq!(excluded.len(), 2);
-//     }
+        #[test]
+        fn pure_ws_from_root() {
+            let packages = packages_from("pure_ws/Cargo.toml");
+            let (included, excluded) = Workspace::default()
+                .partition_packages(&packages)
+                .unwrap();
+            // virtual workspace: no root package → nothing selected by default
+            assert_eq!(included.len(), 0);
+            assert_eq!(excluded.len(), 3);
+        }
 
-//     #[test]
-//     fn pure_ws_root() {
-//         let mut metadata = cargo_metadata::MetadataCommand::new();
-//         metadata.manifest_path("tests/fixtures/pure_ws/Cargo.toml");
-//         let metadata = metadata.exec().unwrap();
+        #[test]
+        fn pure_ws_from_leaf() {
+            // When invoked from a leaf manifest, cargo resolves that leaf as the root package
+            let packages = packages_from("pure_ws/c/Cargo.toml");
+            let (included, excluded) = Workspace::default()
+                .partition_packages(&packages)
+                .unwrap();
+            assert_eq!(included.len(), 1); // c is the cargo resolve root
+            assert_eq!(excluded.len(), 2);
+        }
+    }
 
-//         let workspace = Workspace {
-//             ..Default::default()
-//         };
-//         let (included, excluded) = workspace.partition_packages(&metadata);
-//         assert_eq!(included.len(), 3);
-//         assert_eq!(excluded.len(), 0);
-//     }
+    mod partition_all {
+        use super::*;
 
-//     #[test]
-//     fn pure_ws_leaf() {
-//         let mut metadata = cargo_metadata::MetadataCommand::new();
-//         metadata.manifest_path("tests/fixtures/pure_ws/c/Cargo.toml");
-//         let metadata = metadata.exec().unwrap();
+        fn all_workspace() -> Workspace {
+            Workspace {
+                workspace: true,
+                ..Default::default()
+            }
+        }
 
-//         let workspace = Workspace {
-//             ..Default::default()
-//         };
-//         let (included, excluded) = workspace.partition_packages(&metadata);
-//         assert_eq!(included.len(), 1);
-//         assert_eq!(excluded.len(), 2);
-//     }
-// }
+        #[test]
+        fn single_crate() {
+            let packages = packages_from("simple/Cargo.toml");
+            let (included, excluded) = all_workspace().partition_packages(&packages).unwrap();
+            assert_eq!(included.len(), 1);
+            assert_eq!(excluded.len(), 0);
+        }
 
-// #[cfg(test)]
-// mod partition_all {
-//     use super::*;
+        #[test]
+        fn mixed_ws_from_root() {
+            let packages = packages_from("mixed_ws/Cargo.toml");
+            let (included, excluded) = all_workspace().partition_packages(&packages).unwrap();
+            assert_eq!(included.len(), 3);
+            assert_eq!(excluded.len(), 0);
+        }
 
-//     #[test]
-//     fn single_crate() {
-//         let mut metadata = cargo_metadata::MetadataCommand::new();
-//         metadata.manifest_path("tests/fixtures/simple/Cargo.toml");
-//         let metadata = metadata.exec().unwrap();
+        #[test]
+        fn mixed_ws_from_leaf() {
+            let packages = packages_from("mixed_ws/c/Cargo.toml");
+            let (included, excluded) = all_workspace().partition_packages(&packages).unwrap();
+            assert_eq!(included.len(), 3);
+            assert_eq!(excluded.len(), 0);
+        }
 
-//         let workspace = Workspace {
-//             all: true,
-//             ..Default::default()
-//         };
-//         let (included, excluded) = workspace.partition_packages(&metadata);
-//         assert_eq!(included.len(), 1);
-//         assert_eq!(excluded.len(), 0);
-//     }
+        #[test]
+        fn pure_ws_from_root() {
+            let packages = packages_from("pure_ws/Cargo.toml");
+            let (included, excluded) = all_workspace().partition_packages(&packages).unwrap();
+            assert_eq!(included.len(), 3);
+            assert_eq!(excluded.len(), 0);
+        }
 
-//     #[test]
-//     fn mixed_ws_root() {
-//         let mut metadata = cargo_metadata::MetadataCommand::new();
-//         metadata.manifest_path("tests/fixtures/mixed_ws/Cargo.toml");
-//         let metadata = metadata.exec().unwrap();
+        #[test]
+        fn pure_ws_from_leaf() {
+            let packages = packages_from("pure_ws/c/Cargo.toml");
+            let (included, excluded) = all_workspace().partition_packages(&packages).unwrap();
+            assert_eq!(included.len(), 3);
+            assert_eq!(excluded.len(), 0);
+        }
+    }
 
-//         let workspace = Workspace {
-//             all: true,
-//             ..Default::default()
-//         };
-//         let (included, excluded) = workspace.partition_packages(&metadata);
-//         assert_eq!(included.len(), 3);
-//         assert_eq!(excluded.len(), 0);
-//     }
+    mod partition_package {
+        use super::*;
 
-//     #[test]
-//     fn mixed_ws_leaf() {
-//         let mut metadata = cargo_metadata::MetadataCommand::new();
-//         metadata.manifest_path("tests/fixtures/mixed_ws/c/Cargo.toml");
-//         let metadata = metadata.exec().unwrap();
+        #[test]
+        fn single_crate_explicit() {
+            let packages = packages_from("simple/Cargo.toml");
+            let ws = Workspace {
+                package: vec!["simple".to_owned()],
+                ..Default::default()
+            };
+            let (included, excluded) = ws.partition_packages(&packages).unwrap();
+            assert_eq!(included.len(), 1);
+            assert_eq!(excluded.len(), 0);
+        }
 
-//         let workspace = Workspace {
-//             all: true,
-//             ..Default::default()
-//         };
-//         let (included, excluded) = workspace.partition_packages(&metadata);
-//         assert_eq!(included.len(), 3);
-//         assert_eq!(excluded.len(), 0);
-//     }
+        #[test]
+        fn mixed_ws_explicit_includes_root() {
+            // In mixed_ws, -p a selects a plus the workspace root (b stays in base set)
+            let packages = packages_from("mixed_ws/Cargo.toml");
+            let ws = Workspace {
+                package: vec!["a".to_owned()],
+                ..Default::default()
+            };
+            let (included, excluded) = ws.partition_packages(&packages).unwrap();
+            assert_eq!(included.len(), 2); // a + root (b)
+            assert_eq!(excluded.len(), 1); // c
+        }
 
-//     #[test]
-//     fn pure_ws_root() {
-//         let mut metadata = cargo_metadata::MetadataCommand::new();
-//         metadata.manifest_path("tests/fixtures/pure_ws/Cargo.toml");
-//         let metadata = metadata.exec().unwrap();
+        #[test]
+        fn pure_ws_explicit_only() {
+            // No root in pure_ws, so -p a selects only a
+            let packages = packages_from("pure_ws/Cargo.toml");
+            let ws = Workspace {
+                package: vec!["a".to_owned()],
+                ..Default::default()
+            };
+            let (included, excluded) = ws.partition_packages(&packages).unwrap();
+            assert_eq!(included.len(), 1); // only a
+            assert_eq!(excluded.len(), 2); // b, c
+        }
+    }
 
-//         let workspace = Workspace {
-//             all: true,
-//             ..Default::default()
-//         };
-//         let (included, excluded) = workspace.partition_packages(&metadata);
-//         assert_eq!(included.len(), 3);
-//         assert_eq!(excluded.len(), 0);
-//     }
+    mod partition_exclude {
+        use super::*;
 
-//     #[test]
-//     fn pure_ws_leaf() {
-//         let mut metadata = cargo_metadata::MetadataCommand::new();
-//         metadata.manifest_path("tests/fixtures/pure_ws/c/Cargo.toml");
-//         let metadata = metadata.exec().unwrap();
+        #[test]
+        fn mixed_ws_exclude_one() {
+            let packages = packages_from("mixed_ws/Cargo.toml");
+            let ws = Workspace {
+                workspace: true,
+                exclude: vec!["a".to_owned()],
+                ..Default::default()
+            };
+            let (included, excluded) = ws.partition_packages(&packages).unwrap();
+            assert_eq!(included.len(), 2); // b, c
+            assert_eq!(excluded.len(), 1); // a
+        }
 
-//         let workspace = Workspace {
-//             all: true,
-//             ..Default::default()
-//         };
-//         let (included, excluded) = workspace.partition_packages(&metadata);
-//         assert_eq!(included.len(), 3);
-//         assert_eq!(excluded.len(), 0);
-//     }
-// }
-
-// #[cfg(test)]
-// mod partition_package {
-//     use super::*;
-
-//     #[test]
-//     fn single_crate() {
-//         let mut metadata = cargo_metadata::MetadataCommand::new();
-//         metadata.manifest_path("tests/fixtures/simple/Cargo.toml");
-//         let metadata = metadata.exec().unwrap();
-
-//         let workspace = Workspace {
-//             package: vec!["simple".to_owned()],
-//             ..Default::default()
-//         };
-//         let (included, excluded) = workspace.partition_packages(&metadata);
-//         assert_eq!(included.len(), 1);
-//         assert_eq!(excluded.len(), 0);
-//     }
-
-//     #[test]
-//     fn mixed_ws_root() {
-//         let mut metadata = cargo_metadata::MetadataCommand::new();
-//         metadata.manifest_path("tests/fixtures/mixed_ws/Cargo.toml");
-//         let metadata = metadata.exec().unwrap();
-
-//         let workspace = Workspace {
-//             package: vec!["a".to_owned()],
-//             ..Default::default()
-//         };
-//         let (included, excluded) = workspace.partition_packages(&metadata);
-//         assert_eq!(included.len(), 1);
-//         assert_eq!(excluded.len(), 2);
-//     }
-
-//     #[test]
-//     fn mixed_ws_leaf() {
-//         let mut metadata = cargo_metadata::MetadataCommand::new();
-//         metadata.manifest_path("tests/fixtures/mixed_ws/c/Cargo.toml");
-//         let metadata = metadata.exec().unwrap();
-
-//         let workspace = Workspace {
-//             package: vec!["a".to_owned()],
-//             ..Default::default()
-//         };
-//         let (included, excluded) = workspace.partition_packages(&metadata);
-//         assert_eq!(included.len(), 1);
-//         assert_eq!(excluded.len(), 2);
-//     }
-
-//     #[test]
-//     fn pure_ws_root() {
-//         let mut metadata = cargo_metadata::MetadataCommand::new();
-//         metadata.manifest_path("tests/fixtures/pure_ws/Cargo.toml");
-//         let metadata = metadata.exec().unwrap();
-
-//         let workspace = Workspace {
-//             package: vec!["a".to_owned()],
-//             ..Default::default()
-//         };
-//         let (included, excluded) = workspace.partition_packages(&metadata);
-//         assert_eq!(included.len(), 1);
-//         assert_eq!(excluded.len(), 2);
-//     }
-
-//     #[test]
-//     fn pure_ws_leaf() {
-//         let mut metadata = cargo_metadata::MetadataCommand::new();
-//         metadata.manifest_path("tests/fixtures/pure_ws/c/Cargo.toml");
-//         let metadata = metadata.exec().unwrap();
-
-//         let workspace = Workspace {
-//             package: vec!["a".to_owned()],
-//             ..Default::default()
-//         };
-//         let (included, excluded) = workspace.partition_packages(&metadata);
-//         assert_eq!(included.len(), 1);
-//         assert_eq!(excluded.len(), 2);
-//     }
-// }
-// }
+        #[test]
+        fn pure_ws_exclude_one() {
+            let packages = packages_from("pure_ws/Cargo.toml");
+            let ws = Workspace {
+                workspace: true,
+                exclude: vec!["b".to_owned()],
+                ..Default::default()
+            };
+            let (included, excluded) = ws.partition_packages(&packages).unwrap();
+            assert_eq!(included.len(), 2); // a, c
+            assert_eq!(excluded.len(), 1); // b
+        }
+    }
+}

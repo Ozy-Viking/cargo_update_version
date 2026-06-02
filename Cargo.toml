@@ -30,6 +30,9 @@ indexmap = "2.10.0"
 [features]
 unstable = []
 
+[dev-dependencies]
+cargo_metadata = "0.21.0"
+
 
 [[bin]]
 name = "cargo-uv"

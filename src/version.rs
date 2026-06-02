@@ -219,121 +219,145 @@ pub trait Incrimentable {
     fn increment_by(&mut self, n: isize);
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use semver::BuildMetadata;
-//     use semver::Prerelease;
+#[cfg(test)]
+mod tests {
+    use semver::{BuildMetadata, Prerelease, Version};
 
-//     use super::*;
+    use super::*;
 
-//     macro_rules! version {
-//         ($maj:literal $min:literal $pat:literal) => {
-//             Version::new($maj, $min, $pat)
-//         };
-//         ($maj:literal $min:literal $pat:literal -$pre:ident) => {{
-//             let mut v = version!($maj $min $pat);
-//             v.pre = semver::Prerelease::new(stringify!($pre)).unwrap_or_default();
-//             v
-//         }};
-//         ($maj:literal $min:literal $pat:literal -$pre:ident +$build:ident) => {{
-//             let mut v = version!($maj $min $pat -$pre);
-//             v.build = semver::BuildMetadata::new(stringify!($build)).unwrap_or_default();
-//             v
-//         }};
-//         ($ver:literal) => {
-//             semver::Version::parse($ver).unwrap()
-//         }
-//     }
-//     #[test]
-//     fn test_version_macro() {
-//         let basic = Version::new(1, 1, 0);
-//         assert_eq!(basic, version!(1 1 0));
+    macro_rules! version {
+        ($maj:literal $min:literal $pat:literal) => {
+            Version::new($maj, $min, $pat)
+        };
+        ($maj:literal $min:literal $pat:literal -$pre:ident) => {{
+            let mut v = version!($maj $min $pat);
+            v.pre = semver::Prerelease::new(stringify!($pre)).unwrap_or_default();
+            v
+        }};
+        ($maj:literal $min:literal $pat:literal -$pre:ident +$build:ident) => {{
+            let mut v = version!($maj $min $pat -$pre);
+            v.build = semver::BuildMetadata::new(stringify!($build)).unwrap_or_default();
+            v
+        }};
+        ($ver:literal) => {
+            semver::Version::parse($ver).unwrap()
+        };
+    }
 
-//         let mut basic_with_pre = basic.clone();
-//         basic_with_pre.pre = semver::Prerelease::new("alpha").unwrap();
-//         assert_eq!(basic_with_pre, version!(1 1 0 -alpha));
-//         let mut basic_with_pre_and_build = basic_with_pre.clone();
-//         basic_with_pre_and_build.build = BuildMetadata::new("test").unwrap();
-//         assert_ne!(basic_with_pre, basic_with_pre_and_build);
-//         assert_eq!(basic_with_pre_and_build, version!(1 1 0 -alpha +test));
-//     }
+    #[test]
+    fn version_macro() {
+        let basic = Version::new(1, 1, 0);
+        assert_eq!(basic, version!(1 1 0));
+        let mut with_pre = basic.clone();
+        with_pre.pre = Prerelease::new("alpha").unwrap();
+        assert_eq!(with_pre, version!(1 1 0 -alpha));
+        let mut with_build = with_pre.clone();
+        with_build.build = BuildMetadata::new("test").unwrap();
+        assert_ne!(with_pre, with_build);
+        assert_eq!(with_build, version!(1 1 0 -alpha +test));
+    }
 
-//     #[test]
-//     fn bump_patch_simple() {
-//         let mut version = version!(0 1 1);
+    #[test]
+    fn bump_patch_simple() {
+        let mut v = version!(0 1 1);
+        v.try_bump_patch().unwrap();
+        assert_eq!(v, version!(0 1 2), "0.1.1 -> 0.1.2");
+        v.try_bump_patch().unwrap();
+        assert_eq!(v, version!(0 1 3), "0.1.2 -> 0.1.3");
+    }
 
-//         bump_patch(&mut version);
-//         assert_eq!(version, version!(0 1 2), "Bump 0.1.1 -> 0.1.2");
-//         bump_patch(&mut version);
-//         assert_eq!(version, version!(0 1 3), "Bump 0.1.2 -> 0.1.3");
-//     }
+    #[test]
+    fn bump_patch_clears_pre() {
+        let mut v = version!("0.1.1-alpha.2");
+        assert_eq!(v.pre, Prerelease::new("alpha.2").unwrap());
+        v.try_bump_patch().unwrap();
+        assert_eq!(v, version!(0 1 1));
+        assert!(v > version!("0.1.1-alpha.2"));
+    }
 
-//     #[test]
-//     fn bump_patch_pre() {
-//         let mut version = version!("0.1.1-alpha.2");
+    #[test]
+    fn bump_minor_simple() {
+        let mut v = version!(0 1 1);
+        v.try_bump_minor(false).unwrap();
+        assert_eq!(v, version!(0 2 0), "0.1.1 -> 0.2.0");
+        v.try_bump_minor(false).unwrap();
+        assert_eq!(v, version!(0 3 0), "0.2.0 -> 0.3.0");
+    }
 
-//         assert_eq!(version.pre, Prerelease::new("alpha.2").unwrap());
-//         bump_patch(&mut version);
-//         assert_eq!(version, version!(0 1 1));
-//         assert!(version > version!("0.1.1-alpha.2"));
-//     }
+    #[test]
+    fn bump_minor_force_clears_pre() {
+        let mut v = version!("0.1.1-alpha.2");
+        v.try_bump_minor(true).unwrap();
+        assert_eq!(v, version!(0 2 0), "0.1.1-alpha.2 -> 0.2.0");
+        assert!(v > version!("0.1.1-alpha.2"));
+    }
 
-//     #[test]
-//     fn bump_minor_simple() {
-//         let mut version = version!(0 1 1);
+    #[test]
+    fn bump_minor_pre_no_force_errors() {
+        let mut v = version!("0.1.1-alpha.2");
+        assert!(v.try_bump_minor(false).is_err());
+    }
 
-//         try_bump_minor(&mut version, false).unwrap();
-//         assert_eq!(version, version!(0 2 0), "Bump 0.1.1 -> 0.2.0");
-//         try_bump_minor(&mut version, false).unwrap();
-//         assert_eq!(version, version!(0 3 0), "Bump 0.2.0 -> 0.3.0");
-//     }
+    #[test]
+    fn bump_major_simple() {
+        let mut v = version!(0 1 1);
+        v.try_bump_major(false).unwrap();
+        assert_eq!(v, version!(1 0 0), "0.1.1 -> 1.0.0");
+        v.try_bump_major(false).unwrap();
+        assert_eq!(v, version!(2 0 0), "1.0.0 -> 2.0.0");
+    }
 
-//     #[test]
-//     fn bump_minor_pre_force() {
-//         let mut version = version!("0.1.1-alpha.2");
+    #[test]
+    fn bump_major_force_clears_pre() {
+        let mut v = version!("0.1.1-alpha.2");
+        v.try_bump_major(true).unwrap();
+        assert_eq!(v, version!(1 0 0), "0.1.1-alpha.2 -> 1.0.0");
+        assert!(v > version!("0.1.1-alpha.2"));
+    }
 
-//         assert_eq!(version.pre, Prerelease::new("alpha.2").unwrap());
-//         try_bump_minor(&mut version, true).unwrap();
-//         assert_eq!(version, version!(0 2 0), "Bump 0.1.1-alpha.2 -> 0.2.0");
-//         assert!(version > version!("0.1.1-alpha.2"));
-//     }
-//     #[test]
-//     #[should_panic]
-//     fn bump_minor_pre_no_force() {
-//         let mut version = version!("0.1.1-alpha.2");
+    #[test]
+    fn bump_major_pre_no_force_errors() {
+        let mut v = version!("0.1.1-alpha.2");
+        assert!(v.try_bump_major(false).is_err());
+    }
 
-//         assert_eq!(version.pre, Prerelease::new("alpha.2").unwrap());
-//         try_bump_minor(&mut version, false).unwrap();
-//     }
+    #[test]
+    fn bump_pre_increments_counter() {
+        let mut v = version!("1.0.0-alpha.1");
+        v.try_bump_pre(false).unwrap();
+        assert_eq!(v, version!("1.0.0-alpha.2"));
+        v.try_bump_pre(false).unwrap();
+        assert_eq!(v, version!("1.0.0-alpha.3"));
+    }
 
-//     #[test]
-//     fn bump_major_simple() -> miette::Result<()> {
-//         let mut version = version!(0 1 1);
+    #[test]
+    fn bump_pre_empty_errors() {
+        let mut v = version!(1 0 0);
+        assert!(v.try_bump_pre(false).is_err());
+    }
 
-//         try_bump_major(&mut version, false)?;
-//         assert_eq!(version, version!(1 0 0), "Bump 0.1.1 -> 1.0.0");
-//         try_bump_major(&mut version, false)?;
-//         assert_eq!(version, version!(2 0 0), "Bump 1.0.0 -> 2.0.0");
-//         Ok(())
-//     }
+    #[test]
+    fn bump_pre_no_dot_errors() {
+        let mut v = version!("1.0.0-alpha");
+        assert!(v.try_bump_pre(false).is_err());
+    }
 
-//     #[test]
-//     fn bump_major_pre() -> miette::Result<()> {
-//         let mut version = version!("0.1.1-alpha.2");
+    #[test]
+    fn set_version_replaces_all_fields() {
+        let mut v = version!("0.1.0-alpha.1");
+        let target = version!("2.3.4");
+        v.set_version(target.clone()).unwrap();
+        assert_eq!(v, target);
+    }
 
-//         assert_eq!(version.pre, Prerelease::new("alpha.2").unwrap());
-//         try_bump_major(&mut version, true)?;
-//         assert_eq!(version, version!(1 0 0), "Bump 0.1.1-alpha.2 -> 1.0.0");
-//         assert!(version > version!("0.1.1-alpha.2"));
-//         Ok(())
-//     }
-
-//     #[test]
-//     #[should_panic]
-//     fn bump_major_pre_no_force() {
-//         let mut version = version!("0.1.1-alpha.2");
-
-//         assert_eq!(version.pre, Prerelease::new("alpha.2").unwrap());
-//         try_bump_major(&mut version, false).unwrap();
-//     }
-// }
+    #[test]
+    fn set_prerelease_updates_pre_only() {
+        let mut v = version!(1 0 0);
+        let pre = Prerelease::new("beta.1").unwrap();
+        v.set_prerelease(pre.clone()).unwrap();
+        assert_eq!(v.pre, pre);
+        assert_eq!(v.major, 1);
+        assert_eq!(v.minor, 0);
+        assert_eq!(v.patch, 0);
+    }
+}
