@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "a"
-version = "0.1.0"
+version = "0.2.4"
 
 [[package]]
 name = "b"
@@ -15,7 +15,4 @@ dependencies = [
 
 [[package]]
 name = "c"
-version = "0.1.0"
-dependencies = [
- "b",
-]
+version = "0.0.3"
