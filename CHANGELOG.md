@@ -1,5 +1,11 @@
 # Changelog
 
+<a name="Upcoming Changes"></a>
+## [Upcoming Changes]
+### Code Refactoring
+- Collapsed multi level if statement
+### Features
+- Add testing to cicd
 
 <a name="1.0.0-rc.2"></a>
 ## [1.0.0-rc.2] - 2025-08-06
