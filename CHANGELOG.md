@@ -6,6 +6,7 @@
 - Collapsed multi level if statement
 ### Features
 - Add testing to cicd
+- **version:** add Incrementable trait and Identifier type with increment logic
 
 <a name="1.0.0-rc.2"></a>
 ## [1.0.0-rc.2] - 2025-08-06
